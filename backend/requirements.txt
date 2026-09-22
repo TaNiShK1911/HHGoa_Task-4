@@ -1,0 +1,13 @@
+fastapi
+uvicorn[standard]
+langgraph
+langchain-core
+pyTigerGraph
+groq
+supabase
+pydantic>=2
+sentence-transformers
+pandas
+pytest
+python-dotenv
+httpx

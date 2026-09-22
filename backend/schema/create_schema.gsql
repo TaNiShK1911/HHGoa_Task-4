@@ -1,0 +1,235 @@
+// ============================================================
+// TigerGraph Schema for Fraud Investigation
+// Graph name: FraudInvestigation
+// Section 3 of Tanishk_implementation_plan.md
+// ============================================================
+
+// --- Define Global Schema ---
+USE GLOBAL
+
+// Drop everything (all graphs, vertices, edges) to start completely fresh
+DROP ALL
+
+// ============================================================
+// VERTEX TYPES
+// ============================================================
+
+// --- Customer ---
+CREATE VERTEX Customer (
+  PRIMARY_ID customer_id STRING,
+  first_seen_ts DATETIME,
+  n_cards INT
+) WITH primary_id_as_attribute="true"
+
+// --- Card ---
+CREATE VERTEX Card (
+  PRIMARY_ID card_id STRING,
+  customer_id STRING,
+  card_network STRING,   // card4: visa, mastercard, etc.
+  card_type STRING,      // card6: credit, debit
+  card2 DOUBLE,
+  card3 DOUBLE,
+  card5 DOUBLE,
+  device_cluster_id STRING,
+  region_cluster_id STRING
+) WITH primary_id_as_attribute="true"
+
+// --- Transaction ---
+// All 393 original Vesta columns + 4 added columns (customer_id, ts, channel, risk_score)
+// = 397 attributes total
+CREATE VERTEX Transaction (
+  PRIMARY_ID txn_id STRING,
+  // === Added columns ===
+  customer_id STRING,
+  ts DATETIME,
+  channel STRING,
+  risk_score DOUBLE,
+  // === Original Vesta columns ===
+  TransactionDT DOUBLE,
+  TransactionAmt DOUBLE,
+  ProductCD STRING,
+  card1 DOUBLE,
+  card2 DOUBLE,
+  card3 DOUBLE,
+  card4 STRING,
+  card5 DOUBLE,
+  card6 STRING,
+  addr1 DOUBLE,
+  addr2 DOUBLE,
+  dist1 DOUBLE,
+  dist2 DOUBLE,
+  P_emaildomain STRING,
+  R_emaildomain STRING,
+  // C1–C14
+  C1 DOUBLE, C2 DOUBLE, C3 DOUBLE, C4 DOUBLE, C5 DOUBLE, C6 DOUBLE, C7 DOUBLE,
+  C8 DOUBLE, C9 DOUBLE, C10 DOUBLE, C11 DOUBLE, C12 DOUBLE, C13 DOUBLE, C14 DOUBLE,
+  // D1–D15
+  D1 DOUBLE, D2 DOUBLE, D3 DOUBLE, D4 DOUBLE, D5 DOUBLE, D6 DOUBLE, D7 DOUBLE,
+  D8 DOUBLE, D9 DOUBLE, D10 DOUBLE, D11 DOUBLE, D12 DOUBLE, D13 DOUBLE, D14 DOUBLE, D15 DOUBLE,
+  // M1–M9 (match flags, stored as STRING since they can be T/F/empty)
+  M1 STRING, M2 STRING, M3 STRING, M4 STRING, M5 STRING, M6 STRING, M7 STRING, M8 STRING, M9 STRING,
+  // V1–V339 (Vesta engineered features)
+  V1 DOUBLE, V2 DOUBLE, V3 DOUBLE, V4 DOUBLE, V5 DOUBLE, V6 DOUBLE, V7 DOUBLE, V8 DOUBLE, V9 DOUBLE, V10 DOUBLE,
+  V11 DOUBLE, V12 DOUBLE, V13 DOUBLE, V14 DOUBLE, V15 DOUBLE, V16 DOUBLE, V17 DOUBLE, V18 DOUBLE, V19 DOUBLE, V20 DOUBLE,
+  V21 DOUBLE, V22 DOUBLE, V23 DOUBLE, V24 DOUBLE, V25 DOUBLE, V26 DOUBLE, V27 DOUBLE, V28 DOUBLE, V29 DOUBLE, V30 DOUBLE,
+  V31 DOUBLE, V32 DOUBLE, V33 DOUBLE, V34 DOUBLE, V35 DOUBLE, V36 DOUBLE, V37 DOUBLE, V38 DOUBLE, V39 DOUBLE, V40 DOUBLE,
+  V41 DOUBLE, V42 DOUBLE, V43 DOUBLE, V44 DOUBLE, V45 DOUBLE, V46 DOUBLE, V47 DOUBLE, V48 DOUBLE, V49 DOUBLE, V50 DOUBLE,
+  V51 DOUBLE, V52 DOUBLE, V53 DOUBLE, V54 DOUBLE, V55 DOUBLE, V56 DOUBLE, V57 DOUBLE, V58 DOUBLE, V59 DOUBLE, V60 DOUBLE,
+  V61 DOUBLE, V62 DOUBLE, V63 DOUBLE, V64 DOUBLE, V65 DOUBLE, V66 DOUBLE, V67 DOUBLE, V68 DOUBLE, V69 DOUBLE, V70 DOUBLE,
+  V71 DOUBLE, V72 DOUBLE, V73 DOUBLE, V74 DOUBLE, V75 DOUBLE, V76 DOUBLE, V77 DOUBLE, V78 DOUBLE, V79 DOUBLE, V80 DOUBLE,
+  V81 DOUBLE, V82 DOUBLE, V83 DOUBLE, V84 DOUBLE, V85 DOUBLE, V86 DOUBLE, V87 DOUBLE, V88 DOUBLE, V89 DOUBLE, V90 DOUBLE,
+  V91 DOUBLE, V92 DOUBLE, V93 DOUBLE, V94 DOUBLE, V95 DOUBLE, V96 DOUBLE, V97 DOUBLE, V98 DOUBLE, V99 DOUBLE, V100 DOUBLE,
+  V101 DOUBLE, V102 DOUBLE, V103 DOUBLE, V104 DOUBLE, V105 DOUBLE, V106 DOUBLE, V107 DOUBLE, V108 DOUBLE, V109 DOUBLE, V110 DOUBLE,
+  V111 DOUBLE, V112 DOUBLE, V113 DOUBLE, V114 DOUBLE, V115 DOUBLE, V116 DOUBLE, V117 DOUBLE, V118 DOUBLE, V119 DOUBLE, V120 DOUBLE,
+  V121 DOUBLE, V122 DOUBLE, V123 DOUBLE, V124 DOUBLE, V125 DOUBLE, V126 DOUBLE, V127 DOUBLE, V128 DOUBLE, V129 DOUBLE, V130 DOUBLE,
+  V131 DOUBLE, V132 DOUBLE, V133 DOUBLE, V134 DOUBLE, V135 DOUBLE, V136 DOUBLE, V137 DOUBLE, V138 DOUBLE, V139 DOUBLE, V140 DOUBLE,
+  V141 DOUBLE, V142 DOUBLE, V143 DOUBLE, V144 DOUBLE, V145 DOUBLE, V146 DOUBLE, V147 DOUBLE, V148 DOUBLE, V149 DOUBLE, V150 DOUBLE,
+  V151 DOUBLE, V152 DOUBLE, V153 DOUBLE, V154 DOUBLE, V155 DOUBLE, V156 DOUBLE, V157 DOUBLE, V158 DOUBLE, V159 DOUBLE, V160 DOUBLE,
+  V161 DOUBLE, V162 DOUBLE, V163 DOUBLE, V164 DOUBLE, V165 DOUBLE, V166 DOUBLE, V167 DOUBLE, V168 DOUBLE, V169 DOUBLE, V170 DOUBLE,
+  V171 DOUBLE, V172 DOUBLE, V173 DOUBLE, V174 DOUBLE, V175 DOUBLE, V176 DOUBLE, V177 DOUBLE, V178 DOUBLE, V179 DOUBLE, V180 DOUBLE,
+  V181 DOUBLE, V182 DOUBLE, V183 DOUBLE, V184 DOUBLE, V185 DOUBLE, V186 DOUBLE, V187 DOUBLE, V188 DOUBLE, V189 DOUBLE, V190 DOUBLE,
+  V191 DOUBLE, V192 DOUBLE, V193 DOUBLE, V194 DOUBLE, V195 DOUBLE, V196 DOUBLE, V197 DOUBLE, V198 DOUBLE, V199 DOUBLE, V200 DOUBLE,
+  V201 DOUBLE, V202 DOUBLE, V203 DOUBLE, V204 DOUBLE, V205 DOUBLE, V206 DOUBLE, V207 DOUBLE, V208 DOUBLE, V209 DOUBLE, V210 DOUBLE,
+  V211 DOUBLE, V212 DOUBLE, V213 DOUBLE, V214 DOUBLE, V215 DOUBLE, V216 DOUBLE, V217 DOUBLE, V218 DOUBLE, V219 DOUBLE, V220 DOUBLE,
+  V221 DOUBLE, V222 DOUBLE, V223 DOUBLE, V224 DOUBLE, V225 DOUBLE, V226 DOUBLE, V227 DOUBLE, V228 DOUBLE, V229 DOUBLE, V230 DOUBLE,
+  V231 DOUBLE, V232 DOUBLE, V233 DOUBLE, V234 DOUBLE, V235 DOUBLE, V236 DOUBLE, V237 DOUBLE, V238 DOUBLE, V239 DOUBLE, V240 DOUBLE,
+  V241 DOUBLE, V242 DOUBLE, V243 DOUBLE, V244 DOUBLE, V245 DOUBLE, V246 DOUBLE, V247 DOUBLE, V248 DOUBLE, V249 DOUBLE, V250 DOUBLE,
+  V251 DOUBLE, V252 DOUBLE, V253 DOUBLE, V254 DOUBLE, V255 DOUBLE, V256 DOUBLE, V257 DOUBLE, V258 DOUBLE, V259 DOUBLE, V260 DOUBLE,
+  V261 DOUBLE, V262 DOUBLE, V263 DOUBLE, V264 DOUBLE, V265 DOUBLE, V266 DOUBLE, V267 DOUBLE, V268 DOUBLE, V269 DOUBLE, V270 DOUBLE,
+  V271 DOUBLE, V272 DOUBLE, V273 DOUBLE, V274 DOUBLE, V275 DOUBLE, V276 DOUBLE, V277 DOUBLE, V278 DOUBLE, V279 DOUBLE, V280 DOUBLE,
+  V281 DOUBLE, V282 DOUBLE, V283 DOUBLE, V284 DOUBLE, V285 DOUBLE, V286 DOUBLE, V287 DOUBLE, V288 DOUBLE, V289 DOUBLE, V290 DOUBLE,
+  V291 DOUBLE, V292 DOUBLE, V293 DOUBLE, V294 DOUBLE, V295 DOUBLE, V296 DOUBLE, V297 DOUBLE, V298 DOUBLE, V299 DOUBLE, V300 DOUBLE,
+  V301 DOUBLE, V302 DOUBLE, V303 DOUBLE, V304 DOUBLE, V305 DOUBLE, V306 DOUBLE, V307 DOUBLE, V308 DOUBLE, V309 DOUBLE, V310 DOUBLE,
+  V311 DOUBLE, V312 DOUBLE, V313 DOUBLE, V314 DOUBLE, V315 DOUBLE, V316 DOUBLE, V317 DOUBLE, V318 DOUBLE, V319 DOUBLE, V320 DOUBLE,
+  V321 DOUBLE, V322 DOUBLE, V323 DOUBLE, V324 DOUBLE, V325 DOUBLE, V326 DOUBLE, V327 DOUBLE, V328 DOUBLE, V329 DOUBLE, V330 DOUBLE,
+  V331 DOUBLE, V332 DOUBLE, V333 DOUBLE, V334 DOUBLE, V335 DOUBLE, V336 DOUBLE, V337 DOUBLE, V338 DOUBLE, V339 DOUBLE
+) WITH primary_id_as_attribute="true"
+
+// --- DeviceProfile ---
+// Compound key: DeviceInfo|id_30|id_31|id_33
+CREATE VERTEX DeviceProfile (
+  PRIMARY_ID device_key STRING,
+  device_type STRING,     // mobile or desktop
+  device_info STRING,     // e.g. SAMSUNG SM-G935F Build/NRD90M
+  os STRING,              // id_30
+  browser STRING,         // id_31
+  screen STRING,          // id_33
+  is_new_flag_seen BOOL
+) WITH primary_id_as_attribute="true"
+
+// --- EmailDomain ---
+CREATE VERTEX EmailDomain (
+  PRIMARY_ID domain STRING
+) WITH primary_id_as_attribute="true"
+
+// --- BillingRegion ---
+CREATE VERTEX BillingRegion (
+  PRIMARY_ID region_code STRING,   // addr1
+  country_code STRING              // addr2
+) WITH primary_id_as_attribute="true"
+
+// --- ClosedCase ---
+CREATE VERTEX ClosedCase (
+  PRIMARY_ID case_id STRING,
+  customer_id STRING,
+  card_id STRING,
+  opened_at DATETIME,
+  closed_at DATETIME,
+  outcome STRING,                // confirmed_fraud | cleared
+  pattern STRING,
+  first_fraud_txn_id STRING,
+  n_txns INT,
+  exposure_usd DOUBLE,
+  actions_taken STRING,
+  report_filed STRING,
+  analyst_notes STRING,
+  embedding LIST<DOUBLE>         // vector embedding of analyst_notes
+) WITH primary_id_as_attribute="true"
+
+// --- InvestigationCase (agent-written) ---
+CREATE VERTEX InvestigationCase (
+  PRIMARY_ID case_id STRING,
+  status STRING,                  // open | closed_fraud | closed_legitimate | escalated
+  verdict STRING,                 // fraud | legitimate | uncertain
+  fraud_probability DOUBLE,
+  pattern STRING,
+  pattern_description STRING,
+  exposure_usd DOUBLE,
+  summary STRING,
+  created_at DATETIME,
+  updated_at DATETIME
+) WITH primary_id_as_attribute="true"
+
+// --- PolicyChunk (one per rule R0–R10) ---
+CREATE VERTEX PolicyChunk (
+  PRIMARY_ID rule_id STRING,
+  text STRING,
+  embedding LIST<DOUBLE>
+) WITH primary_id_as_attribute="true"
+
+// --- PatternChunk (one per known fraud pattern) ---
+CREATE VERTEX PatternChunk (
+  PRIMARY_ID pattern_id STRING,
+  text STRING,
+  embedding LIST<DOUBLE>
+) WITH primary_id_as_attribute="true"
+
+// --- RegDoc (regulatory document chunks) ---
+CREATE VERTEX RegDoc (
+  PRIMARY_ID doc_id STRING,
+  source_url STRING,
+  chunk_text STRING,
+  embedding LIST<DOUBLE>
+) WITH primary_id_as_attribute="true"
+
+
+// ============================================================
+// EDGE TYPES
+// ============================================================
+
+// Customer -> Card
+CREATE DIRECTED EDGE OWNS (FROM Customer, TO Card) WITH REVERSE_EDGE="OWNED_BY"
+
+// Card -> Transaction
+CREATE DIRECTED EDGE MADE (FROM Card, TO Transaction) WITH REVERSE_EDGE="MADE_BY"
+
+// Transaction -> Transaction (ordered by ts within a card)
+CREATE DIRECTED EDGE NEXT (FROM Transaction, TO Transaction)
+
+// Transaction -> DeviceProfile (online only, from identity.csv join)
+CREATE DIRECTED EDGE FROM_DEVICE (FROM Transaction, TO DeviceProfile) WITH REVERSE_EDGE="DEVICE_USED_IN"
+
+// Transaction -> EmailDomain
+CREATE DIRECTED EDGE PURCHASER_EMAIL (FROM Transaction, TO EmailDomain) WITH REVERSE_EDGE="EMAIL_USED_IN"
+
+// Transaction -> BillingRegion
+CREATE DIRECTED EDGE BILLED_IN (FROM Transaction, TO BillingRegion) WITH REVERSE_EDGE="BILLED_FROM"
+
+// ClosedCase -> Transaction
+CREATE DIRECTED EDGE INVOLVES (FROM ClosedCase, TO Transaction) WITH REVERSE_EDGE="INVOLVED_IN"
+
+// ClosedCase -> Card (primary card)
+CREATE DIRECTED EDGE ON_CARD (FROM ClosedCase, TO Card) WITH REVERSE_EDGE="HAD_CASE"
+
+// ClosedCase -> Card (connected cards)
+CREATE DIRECTED EDGE CONNECTED_TO (FROM ClosedCase, TO Card) WITH REVERSE_EDGE="CONNECTED_CASE"
+
+// InvestigationCase -> Transaction (flagged txn)
+CREATE DIRECTED EDGE OPENED_FOR (FROM InvestigationCase, TO Transaction) WITH REVERSE_EDGE="OPENED_CASE"
+
+// InvestigationCase -> Transaction (all affected txns)
+CREATE DIRECTED EDGE AFFECTS (FROM InvestigationCase, TO Transaction) WITH REVERSE_EDGE="AFFECTED_BY"
+
+// InvestigationCase -> Card (connected cards)
+CREATE DIRECTED EDGE LINKS_CARD (FROM InvestigationCase, TO Card) WITH REVERSE_EDGE="LINKED_CASE"
+
+// InvestigationCase -> ClosedCase (cited prior cases)
+CREATE DIRECTED EDGE CITES (FROM InvestigationCase, TO ClosedCase) WITH REVERSE_EDGE="CITED_BY"
+
+// InvestigationCase -> PolicyChunk (rule citations for auditability)
+CREATE DIRECTED EDGE APPLIED_RULE (FROM InvestigationCase, TO PolicyChunk) WITH REVERSE_EDGE="APPLIED_IN"
+
+// ============================================================
+// CREATE THE GRAPH
+// ============================================================
+CREATE GRAPH FraudInvestigation(*)

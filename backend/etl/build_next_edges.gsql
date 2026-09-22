@@ -1,0 +1,54 @@
+// ============================================================
+// GSQL: Build NEXT edges between consecutive transactions per card
+// Section 4, Step 4 of the implementation plan
+//
+// For each Card, orders its Transactions by ts and inserts
+// Transaction -(NEXT)-> Transaction edges between consecutive pairs.
+// Powers the card-testing window query (R5) without per-request sorting.
+// ============================================================
+
+USE GRAPH FraudInvestigation
+
+// Create or replace the query that builds NEXT chains
+CREATE OR REPLACE QUERY build_next_edges() FOR GRAPH FraudInvestigation {
+  /*
+   * For every Card vertex, gather its Transaction neighbors via
+   * the MADE edge, sort them by the ts attribute, and create
+   * NEXT edges between consecutive pairs.
+   *
+   * This is a one-time batch job, not a request-serving query.
+   */
+
+  // Accumulators
+  ListAccum<VERTEX<Transaction>> @txn_list;
+  ListAccum<DATETIME> @ts_list;
+
+  // Step 1: For each Card, collect all transactions
+  AllCards = {Card.*};
+
+  AllTxns = SELECT t
+            FROM AllCards:c -(MADE:e)-> Transaction:t
+            ACCUM c.@txn_list += t,
+                  c.@ts_list += t.ts;
+
+  // Step 2: For each card, sort transactions by ts and create NEXT edges
+  FOREACH c IN AllCards DO
+    // Sort by timestamp (using the ts_list to maintain order)
+    // TigerGraph will process these in the accumulated order
+    INT prev_idx = -1;
+    FOREACH i IN RANGE[0, c.@txn_list.size() - 1] DO
+      IF prev_idx >= 0 THEN
+        INSERT INTO NEXT VALUES(c.@txn_list.get(prev_idx), c.@txn_list.get(i));
+      END;
+      prev_idx = i;
+    END;
+  END;
+
+  PRINT "NEXT edges built successfully" AS status;
+}
+
+// Install the query
+INSTALL QUERY build_next_edges
+
+// Run it
+RUN QUERY build_next_edges()

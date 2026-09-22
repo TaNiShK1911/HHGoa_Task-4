@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: fraud-investigation-backend
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    rootDir: backend
+    envVars:
+      - key: TIGERGRAPH_HOST
+        sync: false
+      - key: TIGERGRAPH_USERNAME
+        sync: false
+      - key: TIGERGRAPH_PASSWORD
+        sync: false
+      - key: TIGERGRAPH_GRAPH_NAME
+        value: FraudInvestigation
+      - key: GROQ_API_KEY
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
