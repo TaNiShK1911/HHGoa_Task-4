@@ -1,6 +1,5 @@
 <div align="center">
-  <img src="frontend/public/favicon.ico" alt="Logo" width="80" height="80">
-  <h1>TigerGraph Agentic Fraud Investigation (HHGoa)</h1>
+  <h1>🐯 TigerGraph Agentic Fraud Investigation (HHGoa)</h1>
   <p>An Explainable-First, Graph-Powered Agentic Fraud Investigation System built for the <strong>TigerGraph HHGoa Hackathon</strong>.</p>
 </div>
 
