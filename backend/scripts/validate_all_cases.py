@@ -60,9 +60,9 @@ def validate_all_cases():
     for case_id in EXPECTED_CASES:
         filepath = os.path.join(CASES_DIR, f"{case_id}.json")
         if os.path.exists(filepath):
-            print(f"  ✓ {case_id}.json exists")
+            print(f"  PASS {case_id}.json exists")
         else:
-            print(f"  ✗ {case_id}.json MISSING")
+            print(f"  FAIL {case_id}.json MISSING")
             errors.append(f"{case_id}.json missing")
 
     # ── Check 2–5: Per-file validation ───────────────────────────────────
@@ -90,7 +90,7 @@ def validate_all_cases():
                     result = conn.getVerticesById("Transaction", str(txn_id))
                     if not result:
                         errors.append(f"{case_id}: affected_txn_id {txn_id} not found in graph")
-                        print(f"    ✗ affected_txn_id {txn_id} NOT FOUND")
+                        print(f"    FAIL affected_txn_id {txn_id} NOT FOUND")
                 except Exception:
                     warnings.append(f"{case_id}: could not verify txn {txn_id}")
 
@@ -100,7 +100,7 @@ def validate_all_cases():
                     result = conn.getVerticesById("Card", str(card_id))
                     if not result:
                         errors.append(f"{case_id}: connected_card_id {card_id} not found in graph")
-                        print(f"    ✗ connected_card_id {card_id} NOT FOUND")
+                        print(f"    FAIL connected_card_id {card_id} NOT FOUND")
                 except Exception:
                     warnings.append(f"{case_id}: could not verify card {card_id}")
 
@@ -110,7 +110,7 @@ def validate_all_cases():
                     result = conn.getVerticesById("ClosedCase", str(prior_id))
                     if not result:
                         errors.append(f"{case_id}: similar_prior_case {prior_id} not found in graph")
-                        print(f"    ✗ similar_prior_case {prior_id} NOT FOUND")
+                        print(f"    FAIL similar_prior_case {prior_id} NOT FOUND")
                 except Exception:
                     warnings.append(f"{case_id}: could not verify case {prior_id}")
 
@@ -123,58 +123,58 @@ def validate_all_cases():
 
         if sar_file and not has_file_report:
             errors.append(f"{case_id}: sar.file=true but FILE_REPORT not in final actions")
-            print(f"    ✗ SAR/FILE_REPORT mismatch: sar.file=true but no FILE_REPORT action")
+            print(f"    FAIL SAR/FILE_REPORT mismatch: sar.file=true but no FILE_REPORT action")
         elif not sar_file and has_file_report:
             errors.append(f"{case_id}: FILE_REPORT in final but sar.file=false")
-            print(f"    ✗ SAR/FILE_REPORT mismatch: FILE_REPORT action but sar.file=false")
+            print(f"    FAIL SAR/FILE_REPORT mismatch: FILE_REPORT action but sar.file=false")
         else:
-            print(f"    ✓ SAR/FILE_REPORT agreement")
+            print(f"    PASS SAR/FILE_REPORT agreement")
 
         # Check 4: pattern_description iff pattern == "undocumented"
         pattern = case.get("pattern", "")
         pattern_desc = case.get("pattern_description", "")
         if pattern == "undocumented" and not pattern_desc.strip():
             errors.append(f"{case_id}: pattern is 'undocumented' but pattern_description is empty")
-            print(f"    ✗ Missing pattern_description for undocumented pattern")
+            print(f"    FAIL Missing pattern_description for undocumented pattern")
         elif pattern != "undocumented" and pattern_desc.strip():
             errors.append(f"{case_id}: pattern is '{pattern}' but pattern_description is non-empty")
-            print(f"    ✗ Unexpected pattern_description for pattern '{pattern}'")
+            print(f"    FAIL Unexpected pattern_description for pattern '{pattern}'")
         else:
-            print(f"    ✓ pattern_description consistency")
+            print(f"    PASS pattern_description consistency")
 
         # Check 5: legitimate verdicts → constraints
         verdict = case.get("verdict", "")
         if verdict == "legitimate":
             if case.get("affected_txn_ids", []):
                 errors.append(f"{case_id}: legitimate verdict has non-empty affected_txn_ids")
-                print(f"    ✗ Legitimate verdict with affected_txn_ids")
+                print(f"    FAIL Legitimate verdict with affected_txn_ids")
             if case.get("exposure_usd", 0) != 0:
                 errors.append(f"{case_id}: legitimate verdict has non-zero exposure_usd")
-                print(f"    ✗ Legitimate verdict with exposure_usd={case.get('exposure_usd')}")
+                print(f"    FAIL Legitimate verdict with exposure_usd={case.get('exposure_usd')}")
             if sar_file:
                 errors.append(f"{case_id}: legitimate verdict has sar.file=true")
-                print(f"    ✗ Legitimate verdict with SAR filing")
+                print(f"    FAIL Legitimate verdict with SAR filing")
             if not any(msg for msg in errors if case_id in msg and "legitimate" in msg.lower()):
-                print(f"    ✓ Legitimate verdict constraints")
+                print(f"    PASS Legitimate verdict constraints")
         else:
-            print(f"    ✓ Non-legitimate verdict (no constraint check needed)")
+            print(f"    PASS Non-legitimate verdict (no constraint check needed)")
 
         # Check: sar narrative content when file=true
         if sar_file:
             narrative = sar.get("narrative", "")
             if not narrative.strip():
                 errors.append(f"{case_id}: sar.file=true but narrative is empty")
-                print(f"    ✗ Empty SAR narrative")
+                print(f"    FAIL Empty SAR narrative")
             elif len(narrative.split(". ")) < 4:
                 warnings.append(f"{case_id}: SAR narrative seems short ({len(narrative.split('. '))} sentences)")
-                print(f"    ⚠ SAR narrative may be too short")
+                print(f"    WARN SAR narrative may be too short")
             else:
-                print(f"    ✓ SAR narrative present")
+                print(f"    PASS SAR narrative present")
 
             activity_dates = sar.get("activity_dates", [])
             if len(activity_dates) != 2:
                 errors.append(f"{case_id}: sar activity_dates should have exactly 2 entries, got {len(activity_dates)}")
-                print(f"    ✗ SAR activity_dates: {len(activity_dates)} entries (expected 2)")
+                print(f"    FAIL SAR activity_dates: {len(activity_dates)} entries (expected 2)")
         else:
             # When sar.file=false, all SAR fields should be empty/zero
             if sar.get("narrative", ""):
@@ -187,7 +187,7 @@ def validate_all_cases():
         # Check: written_to_graph
         if not case.get("written_to_graph", False):
             warnings.append(f"{case_id}: written_to_graph is false")
-            print(f"    ⚠ Not written to graph")
+            print(f"    WARN Not written to graph")
 
     # ── Summary ──────────────────────────────────────────────────────────
     print("\n" + "=" * 70)
@@ -200,17 +200,17 @@ def validate_all_cases():
     if errors:
         print("\n  ERRORS (must fix before submission):")
         for e in errors:
-            print(f"    ✗ {e}")
+            print(f"    FAIL {e}")
 
     if warnings:
         print("\n  WARNINGS (should address if possible):")
         for w in warnings:
-            print(f"    ⚠ {w}")
+            print(f"    WARN {w}")
 
     if not errors:
-        print("\n  ✓ ALL VALIDATIONS PASSED — ready for submission!")
+        print("\n  PASS ALL VALIDATIONS PASSED — ready for submission!")
     else:
-        print(f"\n  ✗ {len(errors)} error(s) found. Fix before submitting.")
+        print(f"\n  FAIL {len(errors)} error(s) found. Fix before submitting.")
 
     return len(errors) == 0
 

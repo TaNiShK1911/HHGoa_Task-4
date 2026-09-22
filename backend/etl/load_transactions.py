@@ -76,9 +76,10 @@ def load_transactions():
     conn = get_connection()
     logger.info(f"Connected to TigerGraph at {os.environ['TIGERGRAPH_HOST']}")
     
-    total_txns = 0
+    total_txns = 320000
 
-    for chunk_num, chunk in enumerate(pd.read_csv(TRANSACTIONS_FILE, chunksize=CHUNK_SIZE, low_memory=False)):
+    for chunk_num, chunk in enumerate(pd.read_csv(TRANSACTIONS_FILE, chunksize=CHUNK_SIZE, low_memory=False, skiprows=range(1, 320001))):
+        chunk_num += 64
         logger.info(f"Processing chunk {chunk_num + 1} ({len(chunk)} rows)...")
 
         customers = {}

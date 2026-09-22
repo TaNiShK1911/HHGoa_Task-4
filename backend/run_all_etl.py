@@ -3,8 +3,6 @@ import subprocess
 import sys
 import time
 
-print("Waiting 30 seconds for graph clear to finalize...")
-time.sleep(30)
 
 scripts = [
     'etl/load_transactions.py',

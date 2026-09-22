@@ -139,7 +139,6 @@ class TigerGraphTools:
         conn = self._get_conn()
         try:
             # Get all transactions for this card via edge traversal
-            result = conn.getVertices("Card", card_id)
             edges = conn.getEdges("Card", card_id, "MADE")
             txns = []
             for edge in edges:

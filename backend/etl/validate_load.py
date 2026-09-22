@@ -93,12 +93,12 @@ def validate_load():
         try:
             count = conn.getVertexCount(vertex_type)
             actual = count if isinstance(count, int) else 0
-            status = "PASS" if actual > 0 else "⚠"
+            status = "PASS" if actual > 0 else "WARN"
             print(f"  {status} {vertex_type}: {actual:,}")
             if actual == 0:
                 warnings.append(f"{vertex_type} has 0 vertices")
         except Exception as e:
-            print(f"  ⚠ {vertex_type}: ERROR - {e}")
+            print(f"  WARN {vertex_type}: ERROR - {e}")
             warnings.append(f"Could not count {vertex_type}: {e}")
 
     # ── Check 2: Edge counts ─────────────────────────────────────────────
@@ -110,12 +110,12 @@ def validate_load():
         try:
             count = conn.getEdgeCount(edge_type)
             actual = count if isinstance(count, int) else 0
-            status = "PASS" if actual > 0 else "⚠"
+            status = "PASS" if actual > 0 else "WARN"
             print(f"  {status} {edge_type}: {actual:,}")
             if actual == 0:
                 warnings.append(f"{edge_type} has 0 edges")
         except Exception as e:
-            print(f"  ⚠ {edge_type}: ERROR - {e}")
+            print(f"  WARN {edge_type}: ERROR - {e}")
 
     # ── Check 3: Case pack flagged_txn_id resolution ─────────────────────
     print("\n--- Case Pack ID Validation ---")
@@ -138,7 +138,7 @@ def validate_load():
                 print(f"  FAIL {case_id}: txn {flagged_txn_id} ERROR - {e}")
                 errors.append(f"{case_id}: could not look up {flagged_txn_id}: {e}")
     else:
-        print(f"  ⚠ case_pack.csv not found at {CASE_PACK_FILE}")
+        print(f"  WARN case_pack.csv not found at {CASE_PACK_FILE}")
         warnings.append("case_pack.csv not found")
 
     # ── Check 4: PolicyChunk and PatternChunk completeness ───────────────
@@ -158,7 +158,7 @@ def validate_load():
                     print(f"  FAIL {chunk_type}/{chunk_id} NOT FOUND")
                     errors.append(f"{chunk_type}/{chunk_id} missing")
             except Exception as e:
-                print(f"  ⚠ {chunk_type}/{chunk_id}: ERROR - {e}")
+                print(f"  WARN {chunk_type}/{chunk_id}: ERROR - {e}")
 
     # ── Summary ──────────────────────────────────────────────────────────
     print("\n" + "=" * 60)
@@ -175,7 +175,7 @@ def validate_load():
     if warnings:
         print("\n  WARNINGS:")
         for w in warnings:
-            print(f"    ⚠ {w}")
+            print(f"    WARN {w}")
 
     if not errors:
         print("\n  PASS All critical validations passed!")

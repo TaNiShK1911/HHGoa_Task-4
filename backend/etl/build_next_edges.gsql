@@ -19,30 +19,22 @@ CREATE OR REPLACE QUERY build_next_edges() FOR GRAPH FraudInvestigation {
    * This is a one-time batch job, not a request-serving query.
    */
 
-  // Accumulators
-  ListAccum<VERTEX<Transaction>> @txn_list;
-  ListAccum<DATETIME> @ts_list;
+  TYPEDEF TUPLE<DATETIME ts, VERTEX<Transaction> v> TxnTuple;
+  HeapAccum<TxnTuple>(100000, ts ASC) @txn_heap;
+  ListAccum<VERTEX<Transaction>> @sorted_txns;
 
-  // Step 1: For each Card, collect all transactions
   AllCards = {Card.*};
 
-  AllTxns = SELECT t
-            FROM AllCards:c -(MADE:e)-> Transaction:t
-            ACCUM c.@txn_list += t,
-                  c.@ts_list += t.ts;
-
-  // Step 2: For each card, sort transactions by ts and create NEXT edges
-  FOREACH c IN AllCards DO
-    // Sort by timestamp (using the ts_list to maintain order)
-    // TigerGraph will process these in the accumulated order
-    INT prev_idx = -1;
-    FOREACH i IN RANGE[0, c.@txn_list.size() - 1] DO
-      IF prev_idx >= 0 THEN
-        INSERT INTO NEXT VALUES(c.@txn_list.get(prev_idx), c.@txn_list.get(i));
-      END;
-      prev_idx = i;
-    END;
-  END;
+  AllCards = SELECT c
+             FROM AllCards:c -(MADE:e)-> Transaction:t
+             ACCUM c.@txn_heap += TxnTuple(t.ts, t)
+             POST-ACCUM
+                 FOREACH tup IN c.@txn_heap DO
+                     c.@sorted_txns += tup.v
+                 END,
+                 FOREACH i IN RANGE[1, c.@sorted_txns.size() - 1] DO
+                     INSERT INTO NEXT VALUES(c.@sorted_txns.get(i-1), c.@sorted_txns.get(i))
+                 END;
 
   PRINT "NEXT edges built successfully" AS status;
 }
