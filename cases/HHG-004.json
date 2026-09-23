@@ -1,0 +1,119 @@
+{
+  "case_id": "HHG-004",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.72,
+    "pattern": "card_not_present_fraud",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3583227"
+    ],
+    "first_suspicious_txn_id": "3583227",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 128.33,
+    "evidence": [
+      {
+        "claim": "Customer filed a report denying the transaction: Customer C08106 message: 'I never made this $128.33 purchase. Please check my card.' Refers to 3583227.",
+        "source": "customer",
+        "ref": "trigger:customer_report",
+        "entity_ids": [
+          "C08106",
+          "C08106-K1"
+        ]
+      },
+      {
+        "claim": "No transactions found on card C08106-K1 in the last 48 hours",
+        "source": "graph",
+        "ref": "query:card_window(card_id=C08106-K1, hours=48)",
+        "entity_ids": []
+      },
+      {
+        "claim": "No unusual billing region activity found in region 0",
+        "source": "graph",
+        "ref": "query:region_cluster(region_code=0, window_days=30)",
+        "entity_ids": []
+      },
+      {
+        "claim": "Customer C08106 baseline: 0 historical transactions, amount range $0.00\u2013$0.00 (avg $0.00), typical products: unknown",
+        "source": "graph",
+        "ref": "query:customer_baseline(customer_id=C08106)",
+        "entity_ids": [
+          "C08106"
+        ]
+      },
+      {
+        "claim": "No prior closed cases found touching entities: C08106-K1",
+        "source": "graph",
+        "ref": "query:closed_case_lookup(entity_ids=['C08106-K1'])",
+        "entity_ids": []
+      },
+      {
+        "claim": "Retrieved 3 ClosedCase chunk(s): CC-3931, CC-4437, CC-0893",
+        "source": "graph",
+        "ref": "query:vector_search(chunk_type=ClosedCase, k=3)",
+        "entity_ids": [
+          "CC-3931",
+          "CC-4437",
+          "CC-0893"
+        ]
+      },
+      {
+        "claim": "Retrieved 3 PolicyChunk chunk(s): R2, R4, R6",
+        "source": "document",
+        "ref": "query:vector_search(chunk_type=PolicyChunk, k=3)",
+        "entity_ids": [
+          "R2",
+          "R4",
+          "R6"
+        ]
+      }
+    ],
+    "similar_prior_cases": [],
+    "summary": "A customer reported an unauthorized online purchase of $128.33 on a card with no previous activity. The lack of historical usage and the nature of the transaction align with typical card\u2011not\u2011present fraud patterns. While the risk score is low, the direct customer denial and absence of legitimate usage suggest a moderate likelihood of fraud.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-004"
+  },
+  "evidence_requests": [
+    {
+      "type": "customer_validation",
+      "asked_after_step": 0,
+      "assumed_response": "Customer C08106 message: 'I never made this $128.33 purchase. Please check my card.' Refers to 3583227."
+    }
+  ],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Moderate risk \u2014 monitor card activity"
+      }
+    ],
+    "final": [
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "R2: customer denied the transaction"
+      },
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "R2: customer denial requires case creation"
+      }
+    ],
+    "what_changed": "Added: BLOCK_CARD, CREATE_CASE. Removed: MONITOR_CARD. Customer reply: denied."
+  },
+  "sar": {
+    "file": false,
+    "reason": "Confirmed fraud but below filing thresholds: exposure \u2264$1,000, no shared-origin link, documented pattern (Section 3a).",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Customer denied the transaction (R2). Fraud probability adjusted to 0.72. Sufficient evidence for fraud determination.",
+  "tool_calls": 9,
+  "tokens": 3417,
+  "latency_s": 12.3
+}

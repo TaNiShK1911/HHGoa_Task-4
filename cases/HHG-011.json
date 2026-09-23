@@ -1,0 +1,119 @@
+{
+  "case_id": "HHG-011",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.72,
+    "pattern": "card_not_present_fraud",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3583368"
+    ],
+    "first_suspicious_txn_id": "3583368",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 131.3,
+    "evidence": [
+      {
+        "claim": "Customer filed a report denying the transaction: Customer C11923 message: 'I never made this $131.30 purchase. Please check my card.' Refers to 3583368.",
+        "source": "customer",
+        "ref": "trigger:customer_report",
+        "entity_ids": [
+          "C11923",
+          "C11923-K2"
+        ]
+      },
+      {
+        "claim": "No transactions found on card C11923-K2 in the last 48 hours",
+        "source": "graph",
+        "ref": "query:card_window(card_id=C11923-K2, hours=48)",
+        "entity_ids": []
+      },
+      {
+        "claim": "No unusual billing region activity found in region 0",
+        "source": "graph",
+        "ref": "query:region_cluster(region_code=0, window_days=30)",
+        "entity_ids": []
+      },
+      {
+        "claim": "Customer C11923 baseline: 0 historical transactions, amount range $0.00\u2013$0.00 (avg $0.00), typical products: unknown",
+        "source": "graph",
+        "ref": "query:customer_baseline(customer_id=C11923)",
+        "entity_ids": [
+          "C11923"
+        ]
+      },
+      {
+        "claim": "No prior closed cases found touching entities: C11923-K2",
+        "source": "graph",
+        "ref": "query:closed_case_lookup(entity_ids=['C11923-K2'])",
+        "entity_ids": []
+      },
+      {
+        "claim": "Retrieved 3 ClosedCase chunk(s): CC-1317, CC-3931, CC-2096",
+        "source": "graph",
+        "ref": "query:vector_search(chunk_type=ClosedCase, k=3)",
+        "entity_ids": [
+          "CC-1317",
+          "CC-3931",
+          "CC-2096"
+        ]
+      },
+      {
+        "claim": "Retrieved 3 PolicyChunk chunk(s): R4, R2, R10",
+        "source": "document",
+        "ref": "query:vector_search(chunk_type=PolicyChunk, k=3)",
+        "entity_ids": [
+          "R4",
+          "R2",
+          "R10"
+        ]
+      }
+    ],
+    "similar_prior_cases": [],
+    "summary": "A $131.30 online purchase was flagged by the cardholder as unauthorized. The card has no historical usage, and the transaction occurred in an online channel, fitting a classic card\u2011not\u2011present fraud scenario. Given the denial and absence of prior activity, there is a moderate likelihood (\u224865%) that this is fraudulent.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-011"
+  },
+  "evidence_requests": [
+    {
+      "type": "customer_validation",
+      "asked_after_step": 0,
+      "assumed_response": "Customer C11923 message: 'I never made this $131.30 purchase. Please check my card.' Refers to 3583368."
+    }
+  ],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Moderate risk \u2014 monitor card activity"
+      }
+    ],
+    "final": [
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "R2: customer denied the transaction"
+      },
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "R2: customer denial requires case creation"
+      }
+    ],
+    "what_changed": "Added: BLOCK_CARD, CREATE_CASE. Removed: MONITOR_CARD. Customer reply: denied."
+  },
+  "sar": {
+    "file": false,
+    "reason": "Confirmed fraud but below filing thresholds: exposure \u2264$1,000, no shared-origin link, documented pattern (Section 3a).",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Customer denied the transaction (R2). Fraud probability adjusted to 0.72. Sufficient evidence for fraud determination.",
+  "tool_calls": 9,
+  "tokens": 3545,
+  "latency_s": 18.6
+}

@@ -1,0 +1,93 @@
+{
+  "case_id": "HHG-001",
+  "case": {
+    "status": "closed_legitimate",
+    "verdict": "legitimate",
+    "fraud_probability": 0.22,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [],
+    "first_suspicious_txn_id": "",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 0.0,
+    "evidence": [
+      {
+        "claim": "No transactions found on card C12382-K1 in the last 48 hours",
+        "source": "graph",
+        "ref": "query:card_window(card_id=C12382-K1, hours=48)",
+        "entity_ids": []
+      },
+      {
+        "claim": "No unusual billing region activity found in region 444",
+        "source": "graph",
+        "ref": "query:region_cluster(region_code=444, window_days=30)",
+        "entity_ids": []
+      },
+      {
+        "claim": "Customer C12382 baseline: 0 historical transactions, amount range $0.00\u2013$0.00 (avg $0.00), typical products: unknown",
+        "source": "graph",
+        "ref": "query:customer_baseline(customer_id=C12382)",
+        "entity_ids": [
+          "C12382"
+        ]
+      },
+      {
+        "claim": "No prior closed cases found touching entities: C12382-K1",
+        "source": "graph",
+        "ref": "query:closed_case_lookup(entity_ids=['C12382-K1'])",
+        "entity_ids": []
+      },
+      {
+        "claim": "No relevant ClosedCase chunks found for: 'Real-time model scored transaction 3514030 ($77.07, in billing region 444.0) at 0.61. Review and dec'",
+        "source": "graph",
+        "ref": "query:vector_search(chunk_type=ClosedCase, k=3)",
+        "entity_ids": []
+      },
+      {
+        "claim": "Retrieved 3 PolicyChunk chunk(s): R4, R0, R5",
+        "source": "document",
+        "ref": "query:vector_search(chunk_type=PolicyChunk, k=3)",
+        "entity_ids": [
+          "R4",
+          "R0",
+          "R5"
+        ]
+      }
+    ],
+    "similar_prior_cases": [],
+    "summary": "This is the first recorded use of card C12382\u2011K1 for customer C12382, occurring in\u2011person for $77.07 in the expected billing region. No recent or historical activity exists, and no similar cases were found, resulting in a modest fraud probability of about 22%.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-001"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Moderate risk \u2014 monitor card activity"
+      }
+    ],
+    "final": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Moderate risk \u2014 monitor card activity"
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No confirmed or strongly suspected fraud \u2014 no filing required (Section 3a).",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Fraud probability 0.22 is low. No strong indicators of fraud found.",
+  "tool_calls": 9,
+  "tokens": 1821,
+  "latency_s": 402.2
+}

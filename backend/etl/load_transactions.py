@@ -21,7 +21,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-CHUNK_SIZE = 5_000
+CHUNK_SIZE = 2500
 DATA_DIR = os.environ.get(
     "DATA_DIR",
     os.path.join(os.path.dirname(__file__), "..", "..", "HHGOA_IEEE-20260919T091224Z-1-001", "HHGOA_IEEE"),
@@ -76,10 +76,9 @@ def load_transactions():
     conn = get_connection()
     logger.info(f"Connected to TigerGraph at {os.environ['TIGERGRAPH_HOST']}")
     
-    total_txns = 320000
+    total_txns = 155000
 
-    for chunk_num, chunk in enumerate(pd.read_csv(TRANSACTIONS_FILE, chunksize=CHUNK_SIZE, low_memory=False, skiprows=range(1, 320001))):
-        chunk_num += 64
+    for chunk_num, chunk in enumerate(pd.read_csv(TRANSACTIONS_FILE, chunksize=CHUNK_SIZE, low_memory=False, skiprows=range(1, 155000))):
         logger.info(f"Processing chunk {chunk_num + 1} ({len(chunk)} rows)...")
 
         customers = {}

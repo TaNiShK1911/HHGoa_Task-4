@@ -152,6 +152,23 @@ def trigger_node(state: AgentState) -> AgentState:
     state["stop_reason"] = ""
     state["what_changed"] = "nothing"
 
+    # Fix 2: Customer report trigger = implicit denial.
+    # "I never made this purchase" is a denial — apply R2 downstream.
+    if state.get("trigger_type") == "customer_report":
+        state["_customer_reply"] = "denied"
+        trigger_text = state.get("trigger_text", "")
+        state["evidence"].append({
+            "claim": f"Customer filed a report denying the transaction: {trigger_text}",
+            "source": "customer",
+            "ref": "trigger:customer_report",
+            "entity_ids": [state.get("customer_id", ""), state.get("card_id", "")],
+        })
+        state["evidence_requests"].append({
+            "type": "customer_validation",
+            "asked_after_step": 0,
+            "assumed_response": trigger_text,
+        })
+
     _log_node(state, "TRIGGER", {"case_id": state["case_id"]})
     return state
 
@@ -184,6 +201,21 @@ def load_case_context(state: AgentState, tg_tools: TigerGraphTools) -> AgentStat
             }
             state["_region_code"] = str(attrs.get("addr1", ""))
             tg_tools._tool_call_count += 1
+
+            # Look up device profile for this transaction via FROM_DEVICE edge
+            try:
+                device_edges = conn.getEdges("Transaction", state["flagged_txn_id"], "FROM_DEVICE")
+                if device_edges:
+                    device_key = device_edges[0].get("to_id", "")
+                    state["_device_key"] = device_key
+                    if device_key:
+                        state["connected_device_profiles"] = [device_key]
+                    tg_tools._tool_call_count += 1
+                else:
+                    state["_device_key"] = ""
+            except Exception as e:
+                logger.warning(f"Could not look up device profile: {e}")
+                state["_device_key"] = ""
         else:
             state["_case_context"] = {
                 "case_id": state["case_id"],
@@ -192,6 +224,7 @@ def load_case_context(state: AgentState, tg_tools: TigerGraphTools) -> AgentStat
                 "customer_id": state["customer_id"],
             }
             state["_region_code"] = ""
+            state["_device_key"] = ""
     except Exception as e:
         logger.error(f"Failed to load case context: {e}")
         state["_case_context"] = {
@@ -199,6 +232,7 @@ def load_case_context(state: AgentState, tg_tools: TigerGraphTools) -> AgentStat
             "flagged_txn_id": state["flagged_txn_id"],
         }
         state["_region_code"] = ""
+        state["_device_key"] = ""
 
     return state
 
@@ -212,6 +246,15 @@ def gather_evidence(state: AgentState, tg_tools: TigerGraphTools) -> AgentState:
     state["evidence"].append(_to_evidence(card_evidence))
     state["_txn_details"] = card_evidence.get("_details", [])
 
+    # Identify high-risk transactions in the window as potentially affected
+    flagged = state.get("flagged_txn_id", "")
+    for txn in card_evidence.get("_details", []):
+        txn_id = txn.get("txn_id", "")
+        rs = txn.get("risk_score", 0)
+        if txn_id and txn_id != flagged and rs >= 0.5:
+            if txn_id not in state["affected_txn_ids"]:
+                state["affected_txn_ids"].append(txn_id)
+
     # Detect card testing pattern: 3+ small online txns in 1 hour + larger purchase
     _detect_card_testing(state, card_evidence)
 
@@ -221,12 +264,26 @@ def gather_evidence(state: AgentState, tg_tools: TigerGraphTools) -> AgentState:
         device_evidence = tg_tools.device_neighbors(device_key)
         state["evidence"].append(_to_evidence(device_evidence))
         # Track connected cards and device profiles
+        found_cards = device_evidence.get("_card_ids", [])
         state["connected_card_ids"] = list(set(
-            state["connected_card_ids"] + device_evidence.get("_card_ids", [])
+            state["connected_card_ids"] + found_cards
         ))
         # Remove the case's own card from connected
         if state["card_id"] in state["connected_card_ids"]:
             state["connected_card_ids"].remove(state["card_id"])
+
+        # If device is shared across cards, set shared element description
+        if state["connected_card_ids"]:
+            state["_evidence_bundle"] = state.get("_evidence_bundle", {})
+            state["_evidence_bundle"]["shared_element_description"] = (
+                f"device profile {device_key}"
+            )
+            # Also check for closed cases linked to this device
+            closed_cases = device_evidence.get("_closed_case_ids", [])
+            if closed_cases:
+                state["_evidence_bundle"]["shared_element_description"] += (
+                    f" (linked to closed case(s): {', '.join(closed_cases)})"
+                )
 
     # Tool 3: Region cluster — check for out-of-region use
     region_code = state.get("_region_code", "")
@@ -304,6 +361,23 @@ def assess_node(state: AgentState, groq_client: GroqClient) -> AgentState:
     state["fraud_probability"] = result.get("fraud_probability", 0.5)
     state["summary"] = result.get("summary", "")
 
+    # Fix 5: Don't use 'undocumented' when there's simply no data.
+    # 'undocumented' means coordinated/repeated abuse that fits no known pattern.
+    # Having no transaction history is not an undocumented pattern — it's just
+    # missing data.  Downgrade to 'none' unless the description clearly
+    # describes a real novel pattern of abuse.
+    if state["pattern"] == "undocumented":
+        desc_lower = state["pattern_description"].lower()
+        no_data_phrases = [
+            "no prior", "no historical", "no transaction history",
+            "first observed", "first recorded", "first-time",
+            "first time", "no baseline", "no activity", "lack of",
+            "insufficient data", "no record",
+        ]
+        if any(phrase in desc_lower for phrase in no_data_phrases):
+            state["pattern"] = "none"
+            state["pattern_description"] = ""
+
     # Update exposure: sum of affected transaction amounts
     _compute_exposure(state)
 
@@ -330,9 +404,16 @@ def single_signal_check(state: AgentState, groq_client: GroqClient) -> AgentStat
 def decide_actions_initial_node(state: AgentState) -> AgentState:
     """
     DECIDE_ACTIONS_INITIAL: PolicyEngine.decide_initial().
-    No customer reply yet. Pure deterministic Python.
+    For the initial recommendation, we don't factor in customer replies yet
+    (even if the trigger was a customer_report). This creates the action
+    evolution the README requires: initial shows pre-evidence actions,
+    final shows post-evidence actions.
     """
     _log_node(state, "DECIDE_ACTIONS_INITIAL", {})
+
+    # Temporarily clear customer reply for initial decision
+    saved_reply = state.get("_customer_reply")
+    state["_customer_reply"] = None
 
     bundle = _build_evidence_bundle(state)
     actions = decide_initial(
@@ -340,6 +421,9 @@ def decide_actions_initial_node(state: AgentState) -> AgentState:
         probability=state["fraud_probability"],
         pattern=state["pattern"],
     )
+
+    # Restore customer reply
+    state["_customer_reply"] = saved_reply
 
     state["initial_actions"] = [
         {"action": a.action, "route": a.route, "reason": a.reason}
@@ -349,7 +433,12 @@ def decide_actions_initial_node(state: AgentState) -> AgentState:
     # Determine if we need more evidence
     needs_verify = any(a.action in ("VERIFY_WITH_CUSTOMER", "STEP_UP_AUTH") for a in actions)
     ambiguous = 0.30 < state["fraud_probability"] < 0.70 and bundle.is_single_signal
-    state["_needs_more_evidence"] = needs_verify or ambiguous
+
+    # For customer_report cases, the customer has already spoken — always go
+    # through the evidence request path so decide_final applies R2.
+    is_customer_report = state.get("trigger_type") == "customer_report"
+
+    state["_needs_more_evidence"] = needs_verify or ambiguous or is_customer_report
 
     state["_current_step"] = state.get("_current_step", 0) + 1
     return state
@@ -365,8 +454,16 @@ def need_more_evidence_check(state: AgentState) -> str:
 def request_evidence(state: AgentState, supabase_client: Any) -> AgentState:
     """
     REQUEST_EVIDENCE: Log evidence request, pull simulated response from Supabase.
+    For customer_report cases, the denial is already recorded in trigger_node,
+    so we skip to avoid duplication.
     """
     _log_node(state, "REQUEST_EVIDENCE", {})
+
+    # For customer_report cases, the denial evidence was already recorded
+    # in trigger_node. Skip generating a new request.
+    if state.get("trigger_type") == "customer_report":
+        # Customer reply is already "denied" from trigger_node
+        return state
 
     # Determine the type of evidence request
     has_verify = any(
@@ -395,18 +492,11 @@ def request_evidence(state: AgentState, supabase_client: Any) -> AgentState:
 
     if not assumed_response:
         # Generate a reasonable default based on trigger type
-        if state.get("trigger_type") == "customer_report":
-            assumed_response = (
-                f"Customer {state['customer_id']} confirms they did not make "
-                f"the transaction and still has the card."
-            )
-            state["_customer_reply"] = "denied"
-        else:
-            assumed_response = (
-                f"Customer {state['customer_id']} states they did not recognize "
-                f"the transaction on card {state['card_id']}."
-            )
-            state["_customer_reply"] = "denied"
+        assumed_response = (
+            f"Customer {state['customer_id']} states they did not recognize "
+            f"the transaction on card {state['card_id']}."
+        )
+        state["_customer_reply"] = "denied"
 
     # Parse customer reply from assumed response
     response_lower = assumed_response.lower()
@@ -456,6 +546,19 @@ def re_assess_node(state: AgentState, groq_client: GroqClient) -> AgentState:
     if new_pattern != "none":
         state["pattern"] = new_pattern
         state["pattern_description"] = result.get("pattern_description", "")
+
+    # Fix 5: Same undocumented-pattern guard as in assess_node
+    if state["pattern"] == "undocumented":
+        desc_lower = state["pattern_description"].lower()
+        no_data_phrases = [
+            "no prior", "no historical", "no transaction history",
+            "first observed", "first recorded", "first-time",
+            "first time", "no baseline", "no activity", "lack of",
+            "insufficient data", "no record",
+        ]
+        if any(phrase in desc_lower for phrase in no_data_phrases):
+            state["pattern"] = "none"
+            state["pattern_description"] = ""
 
     _compute_exposure(state)
     state["tokens"] = groq_client.total_tokens
@@ -548,10 +651,15 @@ def stop_check_node(state: AgentState) -> AgentState:
         state["fraud_probability"] = min(state["fraud_probability"], 0.10)
         state["affected_txn_ids"] = []
         state["exposure_usd"] = 0.0
-    elif customer_reply == "denied" and prob >= 0.70:
+    elif customer_reply == "denied":
+        # Fix 2: R2 — customer denied the transaction. This is strong evidence
+        # of fraud regardless of probability. Boost probability if needed.
+        if prob < 0.70:
+            state["fraud_probability"] = max(prob, 0.72)
+            prob = state["fraud_probability"]
         state["stop_reason"] = (
-            f"Customer denied the transaction and fraud probability is {prob:.2f}. "
-            f"Sufficient evidence for fraud determination."
+            f"Customer denied the transaction (R2). Fraud probability adjusted to "
+            f"{prob:.2f}. Sufficient evidence for fraud determination."
         )
         state["verdict"] = "fraud"
         state["status"] = "closed_fraud"
@@ -576,6 +684,23 @@ def stop_check_node(state: AgentState) -> AgentState:
         )
         state["verdict"] = "legitimate"
         state["status"] = "closed_legitimate"
+
+    # Fix 3+4: For fraud verdicts, always populate affected_txn_ids and
+    # first_suspicious_txn_id with at least the flagged transaction.
+    if state["verdict"] == "fraud":
+        flagged = state.get("flagged_txn_id", "")
+        if flagged and flagged not in state.get("affected_txn_ids", []):
+            state["affected_txn_ids"] = [flagged] + state.get("affected_txn_ids", [])
+        if not state.get("first_suspicious_txn_id"):
+            state["first_suspicious_txn_id"] = flagged
+        # Recompute exposure now that we have affected txns
+        _compute_exposure(state)
+        # If exposure is still 0 but we have a flagged txn amount, use it
+        if state["exposure_usd"] == 0.0:
+            ctx = state.get("_case_context", {})
+            amount = ctx.get("amount", 0)
+            if amount:
+                state["exposure_usd"] = round(abs(amount), 2)
 
     return state
 

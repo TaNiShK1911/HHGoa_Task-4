@@ -1,0 +1,121 @@
+{
+  "case_id": "HHG-013",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.78,
+    "pattern": "card_not_present_fraud",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3526826"
+    ],
+    "first_suspicious_txn_id": "3526826",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 35.66,
+    "evidence": [
+      {
+        "claim": "No transactions found on card C07671-K2 in the last 48 hours",
+        "source": "graph",
+        "ref": "query:card_window(card_id=C07671-K2, hours=48)",
+        "entity_ids": []
+      },
+      {
+        "claim": "No unusual billing region activity found in region 0",
+        "source": "graph",
+        "ref": "query:region_cluster(region_code=0, window_days=30)",
+        "entity_ids": []
+      },
+      {
+        "claim": "Customer C07671 baseline: 0 historical transactions, amount range $0.00\u2013$0.00 (avg $0.00), typical products: unknown",
+        "source": "graph",
+        "ref": "query:customer_baseline(customer_id=C07671)",
+        "entity_ids": [
+          "C07671"
+        ]
+      },
+      {
+        "claim": "No prior closed cases found touching entities: C07671-K2",
+        "source": "graph",
+        "ref": "query:closed_case_lookup(entity_ids=['C07671-K2'])",
+        "entity_ids": []
+      },
+      {
+        "claim": "Retrieved 3 ClosedCase chunk(s): CC-2096, CC-2444, CC-2533",
+        "source": "graph",
+        "ref": "query:vector_search(chunk_type=ClosedCase, k=3)",
+        "entity_ids": [
+          "CC-2096",
+          "CC-2444",
+          "CC-2533"
+        ]
+      },
+      {
+        "claim": "Retrieved 3 PolicyChunk chunk(s): R4, R5, R0",
+        "source": "document",
+        "ref": "query:vector_search(chunk_type=PolicyChunk, k=3)",
+        "entity_ids": [
+          "R4",
+          "R5",
+          "R0"
+        ]
+      },
+      {
+        "claim": "Customer denied the transactions.",
+        "source": "customer",
+        "ref": "evidence_request:1",
+        "entity_ids": []
+      }
+    ],
+    "similar_prior_cases": [],
+    "summary": "This is the first known use of card C07671\u2011K2, occurring online for $35.66. The real\u2011time model gave a high risk score and the customer has denied the purchase. With no prior legitimate activity to establish a baseline, the evidence points to a card\u2011not\u2011present fraud attempt, with an estimated fraud probability of about 78%.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-013"
+  },
+  "evidence_requests": [
+    {
+      "type": "customer_validation",
+      "asked_after_step": 1,
+      "assumed_response": "Customer denied the transactions."
+    }
+  ],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "DECLINE_TRANSACTION",
+        "route": "L1",
+        "reason": "R5: card testing sequence detected"
+      },
+      {
+        "action": "STEP_UP_AUTH",
+        "route": "auto",
+        "reason": "R5: card testing \u2014 require additional authentication"
+      }
+    ],
+    "final": [
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "R2: customer denied the transaction"
+      },
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "R2: customer denial requires case creation"
+      }
+    ],
+    "what_changed": "Added: BLOCK_CARD, CREATE_CASE. Removed: DECLINE_TRANSACTION, STEP_UP_AUTH. Customer reply: denied."
+  },
+  "sar": {
+    "file": false,
+    "reason": "Confirmed fraud but below filing thresholds: exposure \u2264$1,000, no shared-origin link, documented pattern (Section 3a).",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Customer denied the transaction (R2). Fraud probability adjusted to 0.78. Sufficient evidence for fraud determination.",
+  "tool_calls": 9,
+  "tokens": 3167,
+  "latency_s": 26.5
+}

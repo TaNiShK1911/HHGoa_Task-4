@@ -458,8 +458,11 @@ class TigerGraphTools:
             # Compute embedding locally if not provided
             try:
                 from sentence_transformers import SentenceTransformer
-                model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-                query_embedding = model.encode(query_text).tolist()
+                if not hasattr(self, "_encoder_model"):
+                    logger.info("Initializing SentenceTransformer model for local embedding...")
+                    self._encoder_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
+                
+                query_embedding = self._encoder_model.encode(query_text).tolist()
             except Exception as e:
                 logger.error(f"Failed to compute embedding: {e}")
                 return {
@@ -477,15 +480,53 @@ class TigerGraphTools:
                 "k": k,
             })
         except Exception as e:
-            logger.warning(f"Vector search query failed: {e}")
+            logger.warning(f"Vector search query failed: {e}. Using REST fallback.")
             result = []
+            try:
+                import numpy as np
+                
+                if not hasattr(self, "_embedding_cache"):
+                    self._embedding_cache = {}
+                
+                if chunk_type not in self._embedding_cache:
+                    logger.info(f"Downloading {chunk_type} vertices for local cache...")
+                    self._embedding_cache[chunk_type] = conn.getVertices(chunk_type, limit=10000)
+                
+                vertices = self._embedding_cache[chunk_type]
+                
+                scored_chunks = []
+                query_vec = np.array(query_embedding)
+                query_norm = np.linalg.norm(query_vec)
+                
+                for v in vertices:
+                    attrs = v.get("attributes", v)
+                    emb = attrs.get("embedding")
+                    if emb and len(emb) == len(query_vec):
+                        emb_vec = np.array(emb)
+                        norm = np.linalg.norm(emb_vec) * query_norm
+                        if norm > 0:
+                            score = np.dot(emb_vec, query_vec) / norm
+                            scored_chunks.append((score, v))
+                
+                scored_chunks.sort(key=lambda x: x[0], reverse=True)
+                for score, v in scored_chunks[:k]:
+                    result.append(v)
+            except Exception as inner_e:
+                logger.error(f"Fallback vector search failed: {inner_e}")
 
         entity_ids = []
         chunks = []
         for item in result:
             if isinstance(item, dict):
-                v_id = item.get("v_id", item.get("doc_id", item.get("rule_id", "")))
-                text = item.get("text", item.get("chunk_text", item.get("analyst_notes", "")))
+                # The TigerGraph installed query might return the vertex ID in "v_id" or in attributes
+                attrs = item.get("attributes", item)
+                v_id = item.get("v_id", attrs.get("case_id", attrs.get("doc_id", attrs.get("rule_id", attrs.get("pattern_id", "")))))
+                text = attrs.get("text", attrs.get("chunk_text", attrs.get("analyst_notes", "")))
+                
+                # Sometime TigerGraph returns the ID under the vertex key if it's returning full vertices
+                if not v_id and "v_id" in item:
+                    v_id = item["v_id"]
+                    
                 entity_ids.append(v_id)
                 chunks.append({"id": v_id, "text": text[:500]})
 

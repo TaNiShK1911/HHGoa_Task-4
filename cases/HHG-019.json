@@ -1,0 +1,109 @@
+{
+  "case_id": "HHG-019",
+  "case": {
+    "status": "closed_fraud",
+    "verdict": "fraud",
+    "fraud_probability": 0.78,
+    "pattern": "none",
+    "pattern_description": "",
+    "affected_txn_ids": [
+      "3503878"
+    ],
+    "first_suspicious_txn_id": "3503878",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 99.92,
+    "evidence": [
+      {
+        "claim": "No transactions found on card C07987-K2 in the last 48 hours",
+        "source": "graph",
+        "ref": "query:card_window(card_id=C07987-K2, hours=48)",
+        "entity_ids": []
+      },
+      {
+        "claim": "No unusual billing region activity found in region 264",
+        "source": "graph",
+        "ref": "query:region_cluster(region_code=264, window_days=30)",
+        "entity_ids": []
+      },
+      {
+        "claim": "Customer C07987 baseline: 0 historical transactions, amount range $0.00\u2013$0.00 (avg $0.00), typical products: unknown",
+        "source": "graph",
+        "ref": "query:customer_baseline(customer_id=C07987)",
+        "entity_ids": [
+          "C07987"
+        ]
+      },
+      {
+        "claim": "No prior closed cases found touching entities: C07987-K2",
+        "source": "graph",
+        "ref": "query:closed_case_lookup(entity_ids=['C07987-K2'])",
+        "entity_ids": []
+      },
+      {
+        "claim": "Retrieved 3 ClosedCase chunk(s): CC-2096, CC-2533, CC-0657",
+        "source": "graph",
+        "ref": "query:vector_search(chunk_type=ClosedCase, k=3)",
+        "entity_ids": [
+          "CC-2096",
+          "CC-2533",
+          "CC-0657"
+        ]
+      },
+      {
+        "claim": "Retrieved 3 PolicyChunk chunk(s): R4, R5, R0",
+        "source": "document",
+        "ref": "query:vector_search(chunk_type=PolicyChunk, k=3)",
+        "entity_ids": [
+          "R4",
+          "R5",
+          "R0"
+        ]
+      }
+    ],
+    "similar_prior_cases": [],
+    "summary": "The flagged $99.92 online purchase is the first ever activity for card C07987\u2011K2 and customer C07987, with no prior transactions, regional anomalies, or related cases. The real\u2011time model gave it a 0.90 risk score, suggesting a high likelihood of fraud despite the absence of typical patterns. Given the entirely new account context, we estimate a ~78% probability of fraud.",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-019"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "High fraud probability warrants case creation"
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "High fraud probability warrants card block"
+      }
+    ],
+    "final": [
+      {
+        "action": "CREATE_CASE",
+        "route": "auto",
+        "reason": "High fraud probability warrants case creation"
+      },
+      {
+        "action": "BLOCK_CARD",
+        "route": "L1",
+        "reason": "High fraud probability warrants card block"
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "Confirmed fraud but below filing thresholds: exposure \u2264$1,000, no shared-origin link, documented pattern (Section 3a).",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Fraud probability 0.78 is above the decision threshold. Further investigation unlikely to change the outcome.",
+  "tool_calls": 9,
+  "tokens": 1893,
+  "latency_s": 19.3
+}

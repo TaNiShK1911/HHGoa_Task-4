@@ -1,0 +1,97 @@
+{
+  "case_id": "HHG-020",
+  "case": {
+    "status": "escalated",
+    "verdict": "uncertain",
+    "fraud_probability": 0.45,
+    "pattern": "card_not_present_new_device",
+    "pattern_description": "",
+    "affected_txn_ids": [],
+    "first_suspicious_txn_id": "",
+    "connected_card_ids": [],
+    "connected_device_profiles": [],
+    "exposure_usd": 0.0,
+    "evidence": [
+      {
+        "claim": "No transactions found on card C12265-K2 in the last 48 hours",
+        "source": "graph",
+        "ref": "query:card_window(card_id=C12265-K2, hours=48)",
+        "entity_ids": []
+      },
+      {
+        "claim": "No unusual billing region activity found in region 264",
+        "source": "graph",
+        "ref": "query:region_cluster(region_code=264, window_days=30)",
+        "entity_ids": []
+      },
+      {
+        "claim": "Customer C12265 baseline: 0 historical transactions, amount range $0.00\u2013$0.00 (avg $0.00), typical products: unknown",
+        "source": "graph",
+        "ref": "query:customer_baseline(customer_id=C12265)",
+        "entity_ids": [
+          "C12265"
+        ]
+      },
+      {
+        "claim": "No prior closed cases found touching entities: C12265-K2",
+        "source": "graph",
+        "ref": "query:closed_case_lookup(entity_ids=['C12265-K2'])",
+        "entity_ids": []
+      },
+      {
+        "claim": "Retrieved 3 ClosedCase chunk(s): CC-2096, CC-2533, CC-2537",
+        "source": "graph",
+        "ref": "query:vector_search(chunk_type=ClosedCase, k=3)",
+        "entity_ids": [
+          "CC-2096",
+          "CC-2533",
+          "CC-2537"
+        ]
+      },
+      {
+        "claim": "Retrieved 3 PolicyChunk chunk(s): R4, R5, R0",
+        "source": "document",
+        "ref": "query:vector_search(chunk_type=PolicyChunk, k=3)",
+        "entity_ids": [
+          "R4",
+          "R5",
+          "R0"
+        ]
+      }
+    ],
+    "similar_prior_cases": [],
+    "summary": "The transaction is the first observed use of card C12265\u2011K2 and occurs online, fitting a new\u2011device CNP pattern. No regional or historical red flags are present, and the risk score is moderate (0.52). Given the lack of supporting evidence, the likelihood of fraud is moderate (~45%).",
+    "written_to_graph": true,
+    "graph_case_id": "HHG-020"
+  },
+  "evidence_requests": [],
+  "next_best_actions": {
+    "initial": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Moderate risk \u2014 monitor card activity"
+      }
+    ],
+    "final": [
+      {
+        "action": "MONITOR_CARD",
+        "route": "auto",
+        "reason": "Moderate risk \u2014 monitor card activity"
+      }
+    ],
+    "what_changed": "nothing"
+  },
+  "sar": {
+    "file": false,
+    "reason": "No confirmed or strongly suspected fraud \u2014 no filing required (Section 3a).",
+    "narrative": "",
+    "subjects": [],
+    "total_amount_usd": 0.0,
+    "activity_dates": []
+  },
+  "stop_reason": "Fraud probability 0.45 is in the uncertain range. Evidence gathered is sufficient for escalation.",
+  "tool_calls": 9,
+  "tokens": 1824,
+  "latency_s": 13.8
+}
