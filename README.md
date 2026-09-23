@@ -13,9 +13,9 @@ Unlike naive LLM wrappers that hallucinate fraud patterns or guess actions, this
 
 ### Key Features
 - **Explainable-First Architecture**: Every action taken by the agent (e.g., `BLOCK_CARD`, `FILE_REPORT`) carries a deterministic rule citation (e.g., `R1`, `R5`) traced back to code.
-- **TigerGraph MCP Server**: LangGraph connects natively to TigerGraph using the official MCP protocol, executing GSQL queries dynamically as LangChain tools.
+- **Direct Graph Execution**: LangGraph connects natively to TigerGraph using direct REST calls via pyTigerGraph, executing GSQL queries dynamically as LangChain tools (bypassing the standard MCP wrapper for speed and reliability).
 - **GraphRAG Grounding**: The SAR Narrative and Policy Assessment are grounded purely in semantic chunks stored natively in TigerGraph's vector index.
-- **Next.js Visualization Dashboard**: A sleek, reactive frontend UI displaying Case Feeds, Investigation Traces (LangGraph logs), and a Force-Directed Graph View of the transaction neighborhood.
+- **Vite + TanStack Start Dashboard**: A sleek, reactive frontend UI displaying Case Feeds, Investigation Traces (LangGraph logs), and a Force-Directed Graph View of the transaction neighborhood.
 
 ---
 
@@ -25,10 +25,10 @@ Unlike naive LLM wrappers that hallucinate fraud patterns or guess actions, this
 |-------|------------|---------------|
 | **Graph & Vector Database** | TigerGraph Community Edition | Powers fast neighborhood traversal (GSQL), deep link analysis, and embedded GraphRAG vector search. |
 | **Agent Orchestration** | LangGraph (Python) | Models the complex 8-step investigation loop into an inspectable, stateful graph. |
-| **Tool Execution** | TigerGraph MCP Server | Exposes robust, parameterized GSQL queries as standard LLM tools. |
+| **Tool Execution** | Direct REST API (pyTigerGraph) | Instead of the standard MCP server, we bypassed it for direct pyTigerGraph REST calls to optimize performance and reliability within the tight hackathon deadline, executing GSQL queries dynamically as LangChain tools. |
 | **LLM Provider** | Groq (`llama-3.3-70b-versatile`) | Blazing fast reasoning for evidence synthesis and complex SAR narrative drafting. |
 | **Backend REST API** | FastAPI | Hosts the LangGraph runner and TigerGraph integrations; serves endpoints to the frontend. |
-| **Frontend UI** | Next.js, React, Tailwind CSS | High-performance visualization dashboard. |
+| **Frontend UI** | Vite, TanStack Start, Tailwind CSS | High-performance visualization dashboard. |
 | **Metadata Store** | Supabase (PostgreSQL) | Stores agent configuration and read-heavy case metadata for the dashboard. |
 
 ---
@@ -46,8 +46,8 @@ Unlike naive LLM wrappers that hallucinate fraud patterns or guess actions, this
 │   ├── main.py               # Application entry point
 │   └── requirements.txt      # Python dependencies
 │
-├── frontend/                 # Next.js Application
-│   ├── app/                  # Next.js App Router pages (Case Feed, Trace, Graph View)
+├── frontend/                 # Vite + TanStack Start Application
+│   ├── src/                  # Source files (Case Feed, Trace, Graph View)
 │   ├── components/           # UI Components (CaseTable, GraphCanvas, etc.)
 │   ├── lib/                  # Supabase client and API wrappers
 │   ├── types/                # TypeScript types mirroring backend Pydantic models
@@ -99,7 +99,27 @@ cd frontend
 bun install  # or npm install
 bun run dev  # or npm run dev
 ```
-> The dashboard should now be accessible at `http://localhost:3000`.
+> The dashboard should now be accessible at `http://localhost:8080`.
+
+### 4. Load the Data and Run the Batch
+
+Before you can run the investigation agent, you must initialize the TigerGraph schema and load the hackathon dataset.
+
+1. **Initialize the Schema**: Run the GSQL script located at `backend/schema/create_schema.gsql` in your TigerGraph instance.
+2. **Run ETL**: Load the data using the provided ETL scripts:
+   ```bash
+   cd backend
+   python etl/load_transactions.py
+   python etl/load_identity.py
+   ```
+3. **Run Batch Investigation**: Generate the 20 case results as required by the hackathon submission format:
+   ```bash
+   python scripts/run_batch.py
+   ```
+4. **Validate Output**: Ensure the 20 `.json` files in `backend/cases/` perfectly match the hackathon schema requirements:
+   ```bash
+   python scripts/validate_all_cases.py
+   ```
 
 ---
 
