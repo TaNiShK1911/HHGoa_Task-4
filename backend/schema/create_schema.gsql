@@ -199,8 +199,11 @@ CREATE DIRECTED EDGE NEXT (FROM Transaction, TO Transaction)
 // Transaction -> DeviceProfile (online only, from identity.csv join)
 CREATE DIRECTED EDGE FROM_DEVICE (FROM Transaction, TO DeviceProfile) WITH REVERSE_EDGE="DEVICE_USED_IN"
 
-// Transaction -> EmailDomain
+// Transaction -> EmailDomain (purchaser P_emaildomain)
 CREATE DIRECTED EDGE PURCHASER_EMAIL (FROM Transaction, TO EmailDomain) WITH REVERSE_EDGE="EMAIL_USED_IN"
+
+// Transaction -> EmailDomain (recipient R_emaildomain)
+CREATE DIRECTED EDGE RECIPIENT_EMAIL (FROM Transaction, TO EmailDomain) WITH REVERSE_EDGE="RECIPIENT_EMAIL_USED_IN"
 
 // Transaction -> BillingRegion
 CREATE DIRECTED EDGE BILLED_IN (FROM Transaction, TO BillingRegion) WITH REVERSE_EDGE="BILLED_FROM"

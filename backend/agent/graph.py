@@ -828,9 +828,11 @@ def emit_answer_file(state: AgentState) -> AgentState:
         answer_json = answer
         answer_json["_validation_error"] = str(e)
 
-    # Write to disk
-    os.makedirs("cases", exist_ok=True)
-    filepath = os.path.join("cases", f"{state['case_id']}.json")
+    # Write to disk — always target the project root cases/ directory
+    _project_root = os.path.join(os.path.dirname(__file__), "..", "..")
+    _cases_dir = os.path.join(_project_root, "cases")
+    os.makedirs(_cases_dir, exist_ok=True)
+    filepath = os.path.join(_cases_dir, f"{state['case_id']}.json")
     with open(filepath, "w") as f:
         json.dump(answer_json, f, indent=2, default=str)
 

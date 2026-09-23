@@ -13,8 +13,8 @@ Unlike naive LLM wrappers that hallucinate fraud patterns or guess actions, this
 
 ### Key Features
 - **Explainable-First Architecture**: Every action taken by the agent (e.g., `BLOCK_CARD`, `FILE_REPORT`) carries a deterministic rule citation (e.g., `R1`, `R5`) traced back to code.
-- **Direct Graph Execution**: LangGraph connects natively to TigerGraph using direct REST calls via pyTigerGraph, executing GSQL queries dynamically as LangChain tools (bypassing the standard MCP wrapper for speed and reliability).
-- **GraphRAG Grounding**: The SAR Narrative and Policy Assessment are grounded purely in semantic chunks stored natively in TigerGraph's vector index.
+- **TigerGraph MCP Integration**: Dual-mode graph access — routes queries through the [TigerGraph MCP server](https://github.com/tigergraph/tigergraph-mcp) when available, with transparent fallback to direct pyTigerGraph REST calls for resilience.
+- **GraphRAG Grounding**: The SAR Narrative and Policy Assessment are grounded purely in semantic chunks stored natively in TigerGraph's vector index (ClosedCase analyst_notes, PolicyChunks, RegDocs).
 - **Vite + TanStack Start Dashboard**: A sleek, reactive frontend UI displaying Case Feeds, Investigation Traces (LangGraph logs), and a Force-Directed Graph View of the transaction neighborhood.
 
 ---
@@ -25,8 +25,8 @@ Unlike naive LLM wrappers that hallucinate fraud patterns or guess actions, this
 |-------|------------|---------------|
 | **Graph & Vector Database** | TigerGraph Community Edition | Powers fast neighborhood traversal (GSQL), deep link analysis, and embedded GraphRAG vector search. |
 | **Agent Orchestration** | LangGraph (Python) | Models the complex 8-step investigation loop into an inspectable, stateful graph. |
-| **Tool Execution** | Direct REST API (pyTigerGraph) | Instead of the standard MCP server, we bypassed it for direct pyTigerGraph REST calls to optimize performance and reliability within the tight hackathon deadline, executing GSQL queries dynamically as LangChain tools. |
-| **LLM Provider** | Groq (`llama-3.3-70b-versatile`) | Blazing fast reasoning for evidence synthesis and complex SAR narrative drafting. |
+| **Tool Execution** | TigerGraph MCP + pyTigerGraph REST | Dual-mode: queries route through [TigerGraph MCP server](https://github.com/tigergraph/tigergraph-mcp) when available (set `TIGERGRAPH_MCP_URL`), with transparent fallback to direct pyTigerGraph REST. |
+| **LLM Provider** | Groq (`llama-3.3-70b-versatile`, `llama-3.1-8b-instant`) | Blazing fast reasoning for evidence synthesis and SAR narrative drafting. |
 | **Backend REST API** | FastAPI | Hosts the LangGraph runner and TigerGraph integrations; serves endpoints to the frontend. |
 | **Frontend UI** | Vite, TanStack Start, Tailwind CSS | High-performance visualization dashboard. |
 | **Metadata Store** | Supabase (PostgreSQL) | Stores agent configuration and read-heavy case metadata for the dashboard. |
@@ -39,30 +39,36 @@ Unlike naive LLM wrappers that hallucinate fraud patterns or guess actions, this
 .
 ├── backend/                  # FastAPI Application & LangGraph Agent
 │   ├── agent/                # LangGraph nodes, edges, state schema, & Groq client
+│   │   ├── graph.py          # 16-node LangGraph state machine
+│   │   ├── groq_client.py    # Groq LLM wrapper (llama-3.3-70b + llama-3.1-8b)
+│   │   ├── policy_engine.py  # Deterministic Policy Engine (R1–R10)
+│   │   └── tools_mcp.py      # TigerGraph MCP + REST dual-mode tool wrappers
 │   ├── etl/                  # One-time bulk data load scripts for TigerGraph
 │   ├── routes/               # API Endpoints (/api/cases, /api/cases/{id}/trace, etc.)
-│   ├── schema/               # Pydantic schemas (e.g. answer_schema.py) and GSQL schemas
-│   ├── tests/                # Deterministic Policy Engine unit tests (PyTest)
+│   ├── schema/               # Pydantic schemas + GSQL graph schema
+│   ├── scripts/              # Batch runner + answer file validator
+│   ├── tests/                # Deterministic Policy Engine unit tests (pytest)
 │   ├── main.py               # Application entry point
 │   └── requirements.txt      # Python dependencies
 │
 ├── frontend/                 # Vite + TanStack Start Application
-│   ├── src/                  # Source files (Case Feed, Trace, Graph View)
-│   ├── components/           # UI Components (CaseTable, GraphCanvas, etc.)
-│   ├── lib/                  # Supabase client and API wrappers
-│   ├── types/                # TypeScript types mirroring backend Pydantic models
+│   ├── src/
+│   │   ├── routes/           # Case Feed, Investigation Trace, Graph View
+│   │   ├── components/       # StatusBadges, RuleChip, GraphCanvas, etc.
+│   │   ├── lib/              # API wrappers, Supabase client, policy rules
+│   │   └── types/            # TypeScript types mirroring backend Pydantic models
 │   ├── package.json          # Node dependencies
 │   └── vite.config.ts        # Vite configuration
+│
+├── cases/                    # 20 generated answer files (HHG-001.json – HHG-020.json)
+└── render.yaml               # Render deployment configuration
 ```
 
 ---
 
 ## 🚀 Quickstart Guide
 
-To run the full stack locally, you need a running **TigerGraph** instance (CE or Savanna) and a **Supabase** project.
-
 ### 1. Environment Setup
-Configure your environment variables. 
 Create `backend/.env`:
 ```env
 TIGERGRAPH_HOST=https://your-instance.i.tgcloud.io
@@ -70,6 +76,7 @@ TIGERGRAPH_USERNAME=tigergraph
 TIGERGRAPH_PASSWORD=tigergraph
 TIGERGRAPH_GRAPH_NAME=FraudInvestigation
 TIGERGRAPH_SECRET=your_restpp_secret
+TIGERGRAPH_MCP_URL=http://localhost:9000  # optional — MCP server URL
 GROQ_API_KEY=gsk_...
 SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=ey...
@@ -96,27 +103,29 @@ uvicorn main:app --reload --port 8000
 ### 3. Run the Frontend UI
 ```bash
 cd frontend
-bun install  # or npm install
-bun run dev  # or npm run dev
+npm install
+npm run dev
 ```
-> The dashboard should now be accessible at `http://localhost:8080`.
+> The dashboard should now be accessible at `http://localhost:3000`.
 
 ### 4. Load the Data and Run the Batch
 
-Before you can run the investigation agent, you must initialize the TigerGraph schema and load the hackathon dataset.
-
-1. **Initialize the Schema**: Run the GSQL script located at `backend/schema/create_schema.gsql` in your TigerGraph instance.
-2. **Run ETL**: Load the data using the provided ETL scripts:
+1. **Initialize the Schema**: Run the GSQL script at `backend/schema/create_schema.gsql` in your TigerGraph instance.
+2. **Run ETL**: Load the hackathon data:
    ```bash
    cd backend
    python etl/load_transactions.py
    python etl/load_identity.py
+   python etl/load_closed_cases.py
+   python etl/embed_documents.py
+   python etl/load_case_pack.py
+   python etl/validate_load.py
    ```
-3. **Run Batch Investigation**: Generate the 20 case results as required by the hackathon submission format:
+3. **Run Batch Investigation**: Generate the 20 case answer files:
    ```bash
    python scripts/run_batch.py
    ```
-4. **Validate Output**: Ensure the 20 `.json` files in `backend/cases/` perfectly match the hackathon schema requirements:
+4. **Validate Output**: Ensure all 20 `.json` files in `cases/` pass the hackathon schema checks:
    ```bash
    python scripts/validate_all_cases.py
    ```
@@ -126,27 +135,43 @@ Before you can run the investigation agent, you must initialize the TigerGraph s
 ## 🧠 The Agentic Flow (LangGraph)
 
 When a case is triggered, the agent executes a highly deterministic state machine:
-1. **LOAD_CASE_CONTEXT**: Pulls flagged transaction, card, and customer baselines.
-2. **GATHER_EVIDENCE**: Dispatches parallel GSQL queries (Card Window, Device Neighbors, Region Cluster, Baseline).
-3. **RETRIEVE_MEMORY**: Runs a vector-search over historical closed cases (GraphRAG).
-4. **ASSESS**: Groq synthesizes the raw graph evidence.
-5. **DECIDE_ACTIONS_INITIAL**: Python Deterministic Policy Engine assigns actions (e.g. `BLOCK_CARD`) purely by rule.
-6. **REQUEST_EVIDENCE**: Requests simulated customer input if R1 fires.
-7. **DECIDE_ACTIONS_FINAL**: Adjusts actions based on the new evidence.
-8. **SAR_WRITE**: Drafts the FinCEN report if thresholds are breached.
-9. **WRITE_CASE_TO_GRAPH**: Saves the full context back to TigerGraph.
+1. **TRIGGER**: Loads the case from the case pack CSV.
+2. **LOAD_CASE_CONTEXT**: Pulls flagged transaction, card, and customer data.
+3. **GATHER_EVIDENCE**: Dispatches parallel GSQL queries (Card Window, Device Neighbors, Region Cluster, Baseline).
+4. **RETRIEVE_MEMORY**: Runs vector search over closed cases (GraphRAG) + graph traversal.
+5. **ASSESS**: Groq `llama-3.3-70b-versatile` synthesizes the raw graph evidence.
+6. **SINGLE_SIGNAL_CHECK**: Groq `llama-3.1-8b-instant` classifies single-signal risk (cheap).
+7. **DECIDE_ACTIONS_INITIAL**: Deterministic Policy Engine assigns actions purely by rule.
+8. **REQUEST_EVIDENCE** *(conditional)*: Requests simulated customer input if R1 fires.
+9. **RE_ASSESS** *(conditional)*: Re-evaluates with new evidence.
+10. **DECIDE_ACTIONS_FINAL**: Adjusts actions based on the new evidence.
+11. **STOP_CHECK**: Determines stopping condition.
+12. **SAR_DECISION**: Deterministic check for SAR filing thresholds.
+13. **SAR_WRITE** *(conditional)*: Drafts the FinCEN narrative grounded on RegDoc chunks.
+14. **WRITE_CASE_TO_GRAPH**: Saves the full context back to TigerGraph as an InvestigationCase vertex.
+15. **EMIT_ANSWER_FILE**: Pydantic-validates and writes the JSON answer file to `cases/`.
 
 ---
 
 ## 🧪 Testing
 
-The Policy Engine is heavily unit-tested. Every rule (R1-R10) has a dedicated fixture to ensure the agent cannot hallucinate actions.
+The Policy Engine is heavily unit-tested. Every rule (R1–R10) has dedicated test fixtures to ensure the agent cannot hallucinate actions:
 ```bash
 cd backend
-pytest tests/test_policy_engine.py
+pytest tests/test_policy_engine.py -v
 ```
 
-To validate that all generated case files comply strictly with the hackathon Answer Format:
+To validate that all generated case files comply with the hackathon Answer Format:
 ```bash
-python backend/scripts/validate_all_cases.py
+python scripts/validate_all_cases.py
 ```
+
+---
+
+## 🚢 Deployment
+
+The project is configured for deployment on **Render**:
+- **Backend**: FastAPI on Render Web Service (`render.yaml`)
+- **Frontend**: Vite static build on Render Static Site
+
+Environment variables must be set in the Render dashboard (or `.env` for local).

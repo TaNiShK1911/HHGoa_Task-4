@@ -27,6 +27,8 @@ wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+venv/
+.venv/
 
 # Node / JS
 node_modules/
@@ -34,6 +36,8 @@ dist/
 build/
 .npm
 .yarn
+.vinxi/
+.output/
 
 # IDEs
 .idea/
@@ -45,7 +49,6 @@ build/
 .DS_Store
 Thumbs.db
 
-# Project Specific (Hackathon Guidelines)
+# Project Specific — exclude hackathon data files (too large for git)
 HHGOA_IEEE-20260919T091224Z-1-001/
-Tanishk_implementation_plan.md
 TigerGraph Agentic Fraud Investigation HHGOA.pdf

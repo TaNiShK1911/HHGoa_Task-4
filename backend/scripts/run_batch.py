@@ -74,7 +74,7 @@ def run_batch():
     df = pd.read_csv(CASE_PACK_FILE)
     logger.info(f"Loaded {len(df)} cases from {CASE_PACK_FILE}")
 
-    os.makedirs(os.path.join(os.path.dirname(__file__), "..", "cases"), exist_ok=True)
+    os.makedirs(os.path.join(os.path.dirname(__file__), "..", "..", "cases"), exist_ok=True)
 
     success_count = 0
     start_time = time.time()

@@ -1,15 +1,15 @@
 """
 TigerGraph MCP Tool Wrappers — Section 5 of the implementation plan.
 
-Wraps GSQL queries as LangGraph tools via pyTigerGraph. Each tool's return
-value maps directly onto the Answer Format's evidence object shape:
-    {claim, source, ref, entity_ids}
+Dual-mode TigerGraph access:
+  1. **MCP mode**: When the TigerGraph MCP server
+     (https://github.com/tigergraph/tigergraph-mcp) is reachable, queries are
+     routed through it as the hackathon requires.
+  2. **Direct REST mode**: Falls back to pyTigerGraph REST calls when the MCP
+     server is unavailable, for local development and resilience.
 
-The mapping happens inside each tool wrapper — not scattered across the
-agent graph.
-
-If TigerGraph MCP server is available, uses it; otherwise falls back to
-direct REST API calls via pyTigerGraph.
+Each tool's return value maps directly onto the Answer Format's evidence
+object shape: {claim, source, ref, entity_ids}.
 """
 
 from __future__ import annotations
@@ -27,7 +27,12 @@ logger = logging.getLogger(__name__)
 
 class TigerGraphTools:
     """
-    Tool wrappers for TigerGraph GSQL queries.
+    Dual-mode TigerGraph tool wrappers.
+
+    Probes the TigerGraph MCP server on initialization.  When reachable,
+    installed-query calls are routed through MCP (the hackathon's required
+    integration path).  Falls back transparently to direct pyTigerGraph REST
+    calls when MCP is unavailable.
 
     Each method returns evidence objects in the Answer Format shape:
         {"claim": str, "source": "graph", "ref": str, "entity_ids": [str]}
@@ -47,12 +52,78 @@ class TigerGraphTools:
         self._conn: Optional[tg.TigerGraphConnection] = None
         self._tool_call_count = 0
 
+        # ── MCP server probe ────────────────────────────────────────────
+        self._mcp_base_url = os.environ.get("TIGERGRAPH_MCP_URL", "")
+        self._mcp_available = False
+        if self._mcp_base_url:
+            try:
+                import httpx
+                resp = httpx.get(
+                    f"{self._mcp_base_url.rstrip('/')}/health",
+                    timeout=3.0,
+                )
+                if resp.status_code == 200:
+                    self._mcp_available = True
+                    logger.info(
+                        f"TigerGraph MCP server reachable at {self._mcp_base_url}"
+                    )
+            except Exception as e:
+                logger.info(
+                    f"TigerGraph MCP server not reachable ({e}). "
+                    "Using direct REST via pyTigerGraph."
+                )
+        else:
+            logger.info(
+                "TIGERGRAPH_MCP_URL not set. Using direct REST via pyTigerGraph."
+            )
+
+        # ── Eagerly initialize the SentenceTransformer model ────────────
+        try:
+            from sentence_transformers import SentenceTransformer
+            self._encoder_model = SentenceTransformer(
+                "sentence-transformers/all-MiniLM-L6-v2"
+            )
+            logger.info("SentenceTransformer model pre-loaded.")
+        except Exception as e:
+            logger.warning(f"Could not pre-load SentenceTransformer: {e}")
+            self._encoder_model = None
+
     @property
     def tool_call_count(self) -> int:
         return self._tool_call_count
 
     def reset_tool_call_count(self) -> None:
         self._tool_call_count = 0
+
+    # ── MCP query dispatcher ────────────────────────────────────────────
+
+    def _run_mcp_query(
+        self, query_name: str, params: Dict[str, Any]
+    ) -> Optional[list]:
+        """
+        Attempt to run an installed query through the TigerGraph MCP server.
+
+        Returns the result list on success, or None if MCP is unavailable or
+        the call fails (caller should fall through to direct REST).
+        """
+        if not self._mcp_available:
+            return None
+        try:
+            import httpx
+            resp = httpx.post(
+                f"{self._mcp_base_url.rstrip('/')}/query/{self._graph_name}/{query_name}",
+                json=params,
+                timeout=30.0,
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                # MCP server wraps results under a "results" key
+                return data.get("results", data) if isinstance(data, dict) else data
+        except Exception as e:
+            logger.warning(f"MCP query {query_name} failed: {e}. Falling back to REST.")
+        return None
+
+    # ── Direct pyTigerGraph connection ──────────────────────────────────
 
     def _get_conn(self) -> tg.TigerGraphConnection:
         """Lazily initialize the TigerGraph connection."""
@@ -90,17 +161,19 @@ class TigerGraphTools:
         Returns evidence object with transaction details.
         """
         self._tool_call_count += 1
-        conn = self._get_conn()
 
-        try:
-            # Query transactions on this card, ordered by timestamp
-            result = conn.runInstalledQuery("card_window", params={
-                "card_id": card_id,
-                "hours": hours,
-            })
-        except Exception as e:
-            logger.warning(f"Installed query 'card_window' failed: {e}. Using REST fallback.")
-            result = self._card_window_fallback(card_id, hours)
+        # Try MCP first, then installed query, then REST fallback
+        result = self._run_mcp_query("card_window", {"card_id": card_id, "hours": hours})
+        if result is None:
+            conn = self._get_conn()
+            try:
+                result = conn.runInstalledQuery("card_window", params={
+                    "card_id": card_id,
+                    "hours": hours,
+                })
+            except Exception as e:
+                logger.warning(f"Installed query 'card_window' failed: {e}. Using REST fallback.")
+                result = self._card_window_fallback(card_id, hours)
 
         txn_ids = []
         txn_details = []
@@ -167,15 +240,18 @@ class TigerGraphTools:
         Returns evidence object with shared-device details.
         """
         self._tool_call_count += 1
-        conn = self._get_conn()
 
-        try:
-            result = conn.runInstalledQuery("device_neighbors", params={
-                "device_key": device_key,
-            })
-        except Exception as e:
-            logger.warning(f"Installed query failed: {e}. Using REST fallback.")
-            result = self._device_neighbors_fallback(device_key)
+        # Try MCP first, then installed query, then REST fallback
+        result = self._run_mcp_query("device_neighbors", {"device_key": device_key})
+        if result is None:
+            conn = self._get_conn()
+            try:
+                result = conn.runInstalledQuery("device_neighbors", params={
+                    "device_key": device_key,
+                })
+            except Exception as e:
+                logger.warning(f"Installed query failed: {e}. Using REST fallback.")
+                result = self._device_neighbors_fallback(device_key)
 
         card_ids = set()
         customer_ids = set()
@@ -243,16 +319,19 @@ class TigerGraphTools:
         and any concurrent activity elsewhere for the same customer.
         """
         self._tool_call_count += 1
-        conn = self._get_conn()
 
-        try:
-            result = conn.runInstalledQuery("region_cluster", params={
-                "region_code": region_code,
-                "window_days": window_days,
-            })
-        except Exception as e:
-            logger.warning(f"Installed query failed: {e}. Using REST fallback.")
-            result = []
+        # Try MCP first, then installed query, then REST fallback
+        result = self._run_mcp_query("region_cluster", {"region_code": region_code, "window_days": window_days})
+        if result is None:
+            conn = self._get_conn()
+            try:
+                result = conn.runInstalledQuery("region_cluster", params={
+                    "region_code": region_code,
+                    "window_days": window_days,
+                })
+            except Exception as e:
+                logger.warning(f"Installed query failed: {e}. Using REST fallback.")
+                result = []
 
         entity_ids = []
         anomalous_cards = []
@@ -289,15 +368,18 @@ class TigerGraphTools:
         channel mix. Used for 'does this fit the cardholder's history' check.
         """
         self._tool_call_count += 1
-        conn = self._get_conn()
 
-        try:
-            result = conn.runInstalledQuery("customer_baseline", params={
-                "customer_id": customer_id,
-            })
-        except Exception as e:
-            logger.warning(f"Installed query failed: {e}. Using REST fallback.")
-            result = self._customer_baseline_fallback(customer_id)
+        # Try MCP first, then installed query, then REST fallback
+        result = self._run_mcp_query("customer_baseline", {"customer_id": customer_id})
+        if result is None:
+            conn = self._get_conn()
+            try:
+                result = conn.runInstalledQuery("customer_baseline", params={
+                    "customer_id": customer_id,
+                })
+            except Exception as e:
+                logger.warning(f"Installed query failed: {e}. Using REST fallback.")
+                result = self._customer_baseline_fallback(customer_id)
 
         baseline = {}
         if result and isinstance(result, list) and len(result) > 0:
@@ -455,13 +537,12 @@ class TigerGraphTools:
         conn = self._get_conn()
 
         if query_embedding is None:
-            # Compute embedding locally if not provided
+            # Compute embedding using the pre-loaded SentenceTransformer model
             try:
-                from sentence_transformers import SentenceTransformer
-                if not hasattr(self, "_encoder_model"):
-                    logger.info("Initializing SentenceTransformer model for local embedding...")
+                if self._encoder_model is None:
+                    from sentence_transformers import SentenceTransformer
                     self._encoder_model = SentenceTransformer("sentence-transformers/all-MiniLM-L6-v2")
-                
+
                 query_embedding = self._encoder_model.encode(query_text).tolist()
             except Exception as e:
                 logger.error(f"Failed to compute embedding: {e}")

@@ -70,7 +70,7 @@ async def list_cases():
             logger.warning(f"Supabase query failed: {e}")
 
     # Fallback: read from local case files
-    cases_dir = os.path.join(os.path.dirname(__file__), "..", "cases")
+    cases_dir = os.path.join(os.path.dirname(__file__), "..", "..", "cases")
     cases = []
 
     if os.path.exists(cases_dir):
@@ -115,7 +115,7 @@ async def get_case(case_id: str):
             logger.warning(f"Supabase query failed: {e}")
 
     # Fallback: read from local file
-    filepath = os.path.join(os.path.dirname(__file__), "..", "cases", f"{case_id}.json")
+    filepath = os.path.join(os.path.dirname(__file__), "..", "..", "cases", f"{case_id}.json")
     if os.path.exists(filepath):
         with open(filepath, "r") as f:
             return json.load(f)
@@ -146,7 +146,7 @@ async def get_case_trace(case_id: str):
             logger.warning(f"Audit log query failed: {e}")
 
     # Fallback: read from case file and reconstruct trace
-    filepath = os.path.join(os.path.dirname(__file__), "..", "cases", f"{case_id}.json")
+    filepath = os.path.join(os.path.dirname(__file__), "..", "..", "cases", f"{case_id}.json")
     if os.path.exists(filepath):
         with open(filepath, "r") as f:
             data = json.load(f)
@@ -173,7 +173,7 @@ async def get_case_neighborhood(case_id: str):
     tg_tools = get_tg_tools()
 
     # Get the case details first
-    filepath = os.path.join(os.path.dirname(__file__), "..", "cases", f"{case_id}.json")
+    filepath = os.path.join(os.path.dirname(__file__), "..", "..", "cases", f"{case_id}.json")
     case_data = None
 
     if os.path.exists(filepath):
@@ -304,7 +304,7 @@ async def run_case(case_id: str):
     try:
         result = graph.invoke(initial_state)
         # Read the written answer file
-        filepath = os.path.join(os.path.dirname(__file__), "..", "cases", f"{case_id}.json")
+        filepath = os.path.join(os.path.dirname(__file__), "..", "..", "cases", f"{case_id}.json")
         if os.path.exists(filepath):
             with open(filepath, "r") as f:
                 return json.load(f)

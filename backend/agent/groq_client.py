@@ -19,9 +19,9 @@ from groq import Groq, RateLimitError
 
 logger = logging.getLogger(__name__)
 
-# Model identifiers
-MODEL_LARGE = "openai/gpt-oss-120b"
-MODEL_SMALL = "openai/gpt-oss-20b"
+# Model identifiers — Groq free-tier models
+MODEL_LARGE = "llama-3.3-70b-versatile"
+MODEL_SMALL = "llama-3.1-8b-instant"
 
 # Retry configuration
 MAX_RETRIES = 5

@@ -23,7 +23,7 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-CASES_DIR = os.path.join(os.path.dirname(__file__), "..", "cases")
+CASES_DIR = os.path.join(os.path.dirname(__file__), "..", "..", "cases")
 EXPECTED_CASES = [f"HHG-{i:03d}" for i in range(1, 21)]
 
 
