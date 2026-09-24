@@ -109,7 +109,8 @@ export const traceQuery = (caseId: string) =>
   queryOptions({
     queryKey: ["trace", caseId],
     queryFn: () => api.getTrace(caseId),
-    retry: 1,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 15_000),
     staleTime: 30_000,
   });
 
@@ -117,7 +118,8 @@ export const neighborhoodQuery = (caseId: string) =>
   queryOptions({
     queryKey: ["neighborhood", caseId],
     queryFn: () => api.getNeighborhood(caseId),
-    retry: 1,
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 15_000),
     staleTime: 30_000,
   });
 

@@ -16,7 +16,9 @@ const LEGEND: Array<{ type: string; token: string }> = [
   { type: "device_profile", token: "bg-chart-3" },
   { type: "billing_region", token: "bg-chart-4" },
   { type: "case", token: "bg-chart-5" },
+  { type: "closed_case", token: "bg-chart-5" },
   { type: "customer", token: "bg-primary" },
+  { type: "policy_rule", token: "bg-warning" },
 ];
 
 export const Route = createFileRoute("/cases/$caseId/graph")({

@@ -8,10 +8,15 @@ const TYPE_TOKEN: Record<string, string> = {
   card: "--chart-1",
   device: "--chart-3",
   device_profile: "--chart-3",
+  deviceprofile: "--chart-3",
   region: "--chart-4",
   billing_region: "--chart-4",
+  billingregion: "--chart-4",
   case: "--chart-5",
+  investigationcase: "--chart-5",
+  closedcase: "--chart-5",
   customer: "--primary",
+  policyrule: "--warning",
 };
 
 function readToken(name: string, fallback: string) {
