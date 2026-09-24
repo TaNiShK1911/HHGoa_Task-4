@@ -33,6 +33,27 @@ Unlike naive LLM wrappers that hallucinate fraud patterns or guess actions, this
 
 ---
 
+## 🕸️ Graph Schema
+
+### Vertices
+| Vertex | Key attributes | Populated from |
+|---|---|---|
+| `Customer` | `customer_id` (PK), `first_seen_ts`, `n_cards` | `transactions.csv` |
+| `Card` | `card_id` (PK), `customer_id`, `card_network`, `device_cluster_id` | `transactions.csv` |
+| `Transaction` | `txn_id` (PK), `ts`, `amount`, `product_cd`, `risk_score` | `transactions.csv` |
+| `DeviceProfile` | `device_key` (PK), `device_type`, `is_new_flag_seen` | `identity.csv` |
+| `ClosedCase` | `case_id` (PK), `outcome`, `pattern`, `analyst_notes` (embedded text) | `closed_cases_history.csv` |
+| `Case` | `case_id` (PK), `status`, `verdict`, `fraud_probability`, `summary` | Written by Agent |
+| `PolicyChunk` / `PatternChunk` / `RegDoc` | Text and vector embeddings | Internal configurations & Docs |
+
+### Edges
+- `Customer -(OWNS)-> Card -(MADE)-> Transaction -(NEXT)-> Transaction`
+- `Transaction -(FROM_DEVICE)-> DeviceProfile`
+- `ClosedCase -(INVOLVES)-> Transaction` (and `Card`)
+- `Case -(AFFECTS)-> Transaction` (and `Card`, `ClosedCase`, `PolicyChunk`)
+
+---
+
 ## 📂 Repository Structure
 
 ```text
@@ -151,6 +172,24 @@ When a case is triggered, the agent executes a highly deterministic state machin
 14. **WRITE_CASE_TO_GRAPH**: Saves the full context back to TigerGraph as an InvestigationCase vertex.
 15. **EMIT_ANSWER_FILE**: Pydantic-validates and writes the JSON answer file to `cases/`.
 
+### 🛠️ GSQL Query Library (Tools Exposed via MCP)
+
+| Query name | Purpose | Returns |
+|---|---|---|
+| `card_window(card_id, hours)` | All transactions on a card within a rolling time window, ordered via the `NEXT` chain | List of transactions with amounts/ts/product_cd |
+| `device_neighbors(device_key)` | All cards/customers/transactions sharing a device profile, plus any `ClosedCase` touching that device | Shared-device evidence |
+| `region_cluster(region_code, window_days)` | Cards billed in a region with no prior history there | Out-of-region evidence |
+| `customer_baseline(customer_id)` | Historical spend pattern: typical amount range, typical product codes, typical channel mix | Baseline check for pattern anomalies |
+| `closed_case_lookup(entity_ids)` | Graph traversal to `ClosedCase`s touching any of the given card/device/region IDs | Direct-memory hits |
+| `vector_search(query_text, chunk_type, k)` | Vector top-k over `PolicyChunk`, `PatternChunk`, `ClosedCase.analyst_notes`, or `RegDoc` | GraphRAG retrieval |
+
+### ⚙️ Deterministic Policy Engine (Core Differentiator)
+
+A real fraud decision must be auditable and reproducible. This design uses a deterministic Python rules engine (`backend/agent/policy_engine.py`) that strictly transcribes the 10-rule Fraud Policy. The LLM does **not** hallucinate actions.
+- `decide_initial()`: Evaluates single-signal rules, card-testing patterns, and shared-origin evidence to output `next_best_actions.initial`.
+- `decide_final()`: Reads simulated customer replies (e.g. `denied`, `confirmed`) or timeouts to assign `next_best_actions.final`.
+- `sar_decision()`: Applies Section 3a rules strictly to determine if a SAR report is required based on exposure and undocumented/coordinated abuse.
+
 ---
 
 ## 🧪 Testing
@@ -170,8 +209,9 @@ python scripts/validate_all_cases.py
 
 ## 🚢 Deployment
 
-The project is configured for deployment on **Render**:
-- **Backend**: FastAPI on Render Web Service (`render.yaml`)
-- **Frontend**: Vite static build on Render Static Site
+The project is configured for deployment on **Render** and **Vercel**:
+- **Backend (Render)**: FastAPI on Render Web Service (`render.yaml`). Exposes the LangGraph agent, MCP client, and Groq LLM integration. 
+- **Frontend (Vercel)**: Next.js/Vite frontend deployed seamlessly via Vercel. 
+- **Database (Supabase & TigerGraph)**: Uses Supabase for metadata and simulated evidence configs, while TigerGraph handles heavy graph traversals.
 
-Environment variables must be set in the Render dashboard (or `.env` for local).
+**Environment variables** must be set in the respective Render and Vercel dashboards (or `.env` for local testing). Ensure `ALLOWED_ORIGINS` in the backend includes the frontend domain for proper CORS integration.
