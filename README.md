@@ -44,7 +44,7 @@ Unlike naive LLM wrappers that hallucinate fraud patterns or guess actions, this
 | `DeviceProfile` | `device_key` (PK), `device_type`, `is_new_flag_seen` | `identity.csv` |
 | `ClosedCase` | `case_id` (PK), `outcome`, `pattern`, `analyst_notes` (embedded text) | `closed_cases_history.csv` |
 | `Case` | `case_id` (PK), `status`, `verdict`, `fraud_probability`, `summary` | Written by Agent |
-| `PolicyChunk` / `PatternChunk` / `RegDoc` | Text and vector embeddings | Internal configurations & Docs |
+| `PolicyChunk` / `PatternChunk` / `RegDoc` | Text and vector embeddings along with  Internal configurations & Docs |
 
 ### Edges
 - `Customer -(OWNS)-> Card -(MADE)-> Transaction -(NEXT)-> Transaction`
