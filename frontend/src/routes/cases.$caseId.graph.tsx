@@ -63,68 +63,77 @@ function GraphView() {
         </p>
       </div>
 
-      <div className="mt-3 grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px]">
-        <section className="panel overflow-hidden">
+      <div className="mt-4 relative h-[calc(100vh-200px)] min-h-[600px] rounded-xl border border-border/60 bg-surface/30 overflow-hidden shadow-sm">
+        <div className="absolute inset-0 z-0">
           {isPending && (
-            <div className="space-y-3 p-5">
-              <Skeleton className="h-[500px] w-full" />
-              <p className="text-xs text-muted-foreground">
-                Waking up the investigation service — fetching the graph neighborhood.
-              </p>
+            <div className="flex h-full flex-col items-center justify-center space-y-3 p-5">
+              <Skeleton className="h-full w-full absolute inset-0 opacity-20" />
+              <div className="z-10 flex flex-col items-center gap-3">
+                <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+                <p className="text-sm font-medium text-muted-foreground">
+                  Fetching graph neighborhood...
+                </p>
+              </div>
             </div>
           )}
 
           {isError && (
-            <div className="flex items-start gap-2 p-5 text-sm text-danger">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <div>
-                <p className="font-medium">Neighborhood could not be loaded</p>
-                <p className="text-danger/80">{(error as Error)?.message}</p>
+            <div className="flex h-full items-center justify-center p-5 text-sm text-danger relative z-10">
+              <div className="flex max-w-md flex-col items-center gap-2 rounded-xl border border-danger/30 bg-danger-soft p-5 text-center shadow-sm">
+                <AlertTriangle className="h-8 w-8" />
+                <div>
+                  <p className="font-semibold">Neighborhood could not be loaded</p>
+                  <p className="mt-1 text-danger/80">{(error as Error)?.message}</p>
+                </div>
               </div>
             </div>
           )}
 
           {data && data.nodes.length === 0 && (
-            <p className="p-5 text-sm text-muted-foreground">
-              No connected entities returned for this case.
-            </p>
+            <div className="flex h-full items-center justify-center relative z-10">
+              <p className="rounded-xl border border-border/50 bg-background/80 p-5 text-sm text-muted-foreground backdrop-blur-md">
+                No connected entities returned for this case.
+              </p>
+            </div>
           )}
 
           {data && data.nodes.length > 0 && (
-            <ClientOnly fallback={<Skeleton className="m-5 h-[500px]" />}>
-              <Suspense fallback={<Skeleton className="m-5 h-[500px]" />}>
+            <ClientOnly fallback={<Skeleton className="h-full w-full" />}>
+              <Suspense fallback={<Skeleton className="h-full w-full" />}>
                 <NeighborhoodGraph data={data} onSelect={setSelected} />
               </Suspense>
             </ClientOnly>
           )}
-        </section>
+        </div>
 
-        <aside className="space-y-4">
-          <section className="panel p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        <aside className="absolute right-4 top-4 bottom-4 w-80 overflow-y-auto space-y-4 z-10 pointer-events-none custom-scrollbar pb-4">
+          <section className="rounded-xl border border-border/60 bg-background/80 p-5 shadow-lg backdrop-blur-xl pointer-events-auto transition-all hover:bg-background/90">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Legend
             </h2>
-            <ul className="mt-2 space-y-1.5 text-sm">
+            <ul className="mt-3 space-y-2 text-sm">
               {LEGEND.map((l) => (
-                <li key={l.type} className="flex items-center gap-2">
-                  <span className={`inline-block h-2.5 w-2.5 rounded-full ${l.token}`} />
+                <li key={l.type} className="flex items-center gap-2.5 font-medium">
+                  <span className={`inline-block h-3 w-3 rounded-full shadow-sm ${l.token}`} />
                   {humanise(l.type)}
                 </li>
               ))}
             </ul>
-            <p className="mt-3 text-xs text-muted-foreground">
+            <p className="mt-4 text-[11px] leading-relaxed text-muted-foreground">
               Hover an edge for its relationship type. Zoom in to reveal node labels.
             </p>
           </section>
 
-          <section className="panel p-4">
-            <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+          <section className="rounded-xl border border-border/60 bg-background/80 p-5 shadow-lg backdrop-blur-xl pointer-events-auto transition-all hover:bg-background/90">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
               Node detail
             </h2>
             {!selected ? (
-              <p className="mt-2 text-sm text-muted-foreground">Select a node to inspect it.</p>
+              <div className="mt-4 rounded-lg border border-dashed border-border/60 p-4 text-center">
+                <p className="text-xs text-muted-foreground italic">Select a node to inspect it.</p>
+              </div>
             ) : (
-              <dl className="mt-2 space-y-2 text-sm">
+              <dl className="mt-4 space-y-3 text-sm">
                 {Object.entries(selected)
                   .filter(
                     ([k, v]) =>
@@ -132,11 +141,11 @@ function GraphView() {
                       (typeof v === "string" || typeof v === "number" || typeof v === "boolean"),
                   )
                   .map(([k, v]) => (
-                    <div key={k}>
-                      <dt className="text-xs uppercase tracking-wide text-muted-foreground">
+                    <div key={k} className="border-b border-border/40 pb-2 last:border-0 last:pb-0">
+                      <dt className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1">
                         {humanise(k)}
                       </dt>
-                      <dd className="mono break-all">{String(v)}</dd>
+                      <dd className="mono text-xs break-all text-foreground bg-surface/50 p-1.5 rounded-md border border-border/30">{String(v)}</dd>
                     </div>
                   ))}
               </dl>

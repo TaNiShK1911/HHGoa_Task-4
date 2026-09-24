@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, Search } from "lucide-react";
+import { AlertTriangle, Search, Activity, ShieldAlert, ShieldCheck, HelpCircle, TrendingUp } from "lucide-react";
 
 import { casesQuery } from "@/lib/queries";
 import { formatDateTime, formatUsd, humanise } from "@/lib/format";
@@ -109,27 +109,36 @@ function CaseFeed() {
         </div>
       </div>
 
-      <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        <StatCard label="Cases" value={isPending ? "…" : String(stats.total)} />
+      <section className="mt-4 grid grid-cols-2 gap-4 lg:grid-cols-5">
+        <StatCard label="Cases" value={isPending ? "…" : String(stats.total)} icon={Activity} />
         <StatCard
           label="Fraud"
           value={isPending ? "…" : String(stats.byVerdict.fraud)}
           tone="text-danger"
+          icon={ShieldAlert}
+          gradient
         />
         <StatCard
           label="Legitimate"
           value={isPending ? "…" : String(stats.byVerdict.legitimate)}
           tone="text-success"
+          icon={ShieldCheck}
+          gradient
         />
         <StatCard
           label="Uncertain"
           value={isPending ? "…" : String(stats.byVerdict.uncertain)}
           tone="text-warning"
+          icon={HelpCircle}
+          gradient
         />
         <StatCard
           label="Fraud exposure"
           value={isPending ? "…" : formatUsd(stats.exposure)}
           className="col-span-2 lg:col-span-1"
+          tone="text-danger"
+          icon={TrendingUp}
+          gradient
         />
       </section>
 
@@ -166,10 +175,11 @@ function CaseFeed() {
         </span>
       </section>
 
-      <section className="panel mt-3 overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-surface hover:bg-surface">
+      <section className="mt-4 overflow-hidden rounded-xl border border-border/60 bg-surface/50 shadow-sm backdrop-blur-md">
+        <div className="max-h-[600px] overflow-y-auto">
+          <Table>
+            <TableHeader className="sticky top-0 z-10 bg-surface/95 shadow-sm backdrop-blur-sm">
+              <TableRow className="border-b-border/60 hover:bg-transparent">
               <TableHead className="w-[110px]">Case</TableHead>
               <TableHead className="w-[150px]">Opened</TableHead>
               <TableHead>Trigger</TableHead>
@@ -243,7 +253,8 @@ function CaseFeed() {
               </TableRow>
             )}
           </TableBody>
-        </Table>
+          </Table>
+        </div>
       </section>
 
       {!isConfigured && (
@@ -274,16 +285,27 @@ function StatCard({
   value,
   tone,
   className,
+  icon: Icon,
+  gradient = false,
 }: {
   label: string;
   value: string;
   tone?: string;
   className?: string;
+  icon?: React.ElementType;
+  gradient?: boolean;
 }) {
   return (
-    <div className={`panel px-4 py-3 ${className ?? ""}`}>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className={`mono mt-1 text-xl font-semibold ${tone ?? "text-foreground"}`}>{value}</p>
+    <div className={`relative overflow-hidden rounded-xl border border-border/60 bg-surface/50 p-5 shadow-sm backdrop-blur-md transition-all hover:shadow-md ${className ?? ""}`}>
+      {gradient && tone === "text-danger" && <div className="absolute inset-0 bg-gradient-to-br from-danger/10 via-transparent to-transparent opacity-50" />}
+      {gradient && tone === "text-success" && <div className="absolute inset-0 bg-gradient-to-br from-success/10 via-transparent to-transparent opacity-50" />}
+      {gradient && tone === "text-warning" && <div className="absolute inset-0 bg-gradient-to-br from-warning/10 via-transparent to-transparent opacity-50" />}
+      
+      <div className="relative z-10 flex items-center justify-between">
+        <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{label}</p>
+        {Icon && <Icon className={`h-4 w-4 ${tone ?? "text-muted-foreground"}`} />}
+      </div>
+      <p className={`relative z-10 mono mt-3 text-3xl font-bold tracking-tight ${tone ?? "text-foreground"}`}>{value}</p>
     </div>
   );
 }

@@ -9,6 +9,13 @@ import {
   Loader2,
   Network,
   RefreshCw,
+  Brain,
+  Database,
+  Search,
+  CheckCircle,
+  ShieldAlert,
+  Terminal,
+  Zap,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -262,9 +269,9 @@ function TracePanel({
       )}
 
       {steps && steps.length > 0 && (
-        <ol className="mt-4 space-y-1">
+        <ol className="mt-6 relative">
           {steps.map((step, i) => (
-            <TraceStepRow key={`${step.node_name}-${i}`} step={step} index={i} />
+            <TraceStepRow key={`${step.node_name}-${i}`} step={step} index={i} isLast={i === steps.length - 1} />
           ))}
         </ol>
       )}
@@ -272,40 +279,59 @@ function TracePanel({
   );
 }
 
-function TraceStepRow({ step, index }: { step: TraceStep; index: number }) {
+function getStepIcon(nodeName: string) {
+  const n = nodeName.toLowerCase();
+  if (n.includes("assess") || n.includes("reasoning")) return <Brain className="h-4 w-4" />;
+  if (n.includes("retrieve") || n.includes("memory") || n.includes("database")) return <Database className="h-4 w-4" />;
+  if (n.includes("search") || n.includes("gather")) return <Search className="h-4 w-4" />;
+  if (n.includes("verdict") || n.includes("finish")) return <CheckCircle className="h-4 w-4" />;
+  return <Zap className="h-4 w-4" />;
+}
+
+function TraceStepRow({ step, index, isLast }: { step: TraceStep; index: number; isLast?: boolean }) {
   const [open, setOpen] = useState(false);
+  const Icon = getStepIcon(step.node_name);
+  
   return (
-    <li className="relative pl-7">
-      <span className="absolute left-2 top-7 h-[calc(100%-1rem)] w-px bg-border" />
-      <span className="mono absolute left-0 top-1.5 flex h-4 w-4 items-center justify-center rounded-full border border-border bg-card text-[9px] text-muted-foreground">
-        {index + 1}
+    <li className="relative pl-12 pb-6">
+      {!isLast && <span className="absolute left-[23px] top-8 h-full w-px bg-border/60" />}
+      
+      <span className="absolute left-2 top-1.5 flex h-9 w-9 items-center justify-center rounded-full border border-border bg-surface shadow-sm text-foreground">
+        {Icon}
       </span>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left transition-colors hover:bg-surface"
-      >
-        <span className="mono text-xs font-semibold">{step.node_name}</span>
-        {step.policy_rule_fired && <RuleChip rule={step.policy_rule_fired} />}
-        <span className="ml-auto text-[11px] text-muted-foreground">
-          {formatDateTime(step.timestamp)}
-        </span>
-        <ChevronDown
-          className={`h-3.5 w-3.5 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
-        />
-      </button>
-      {open && (
-        <div className="mb-2 ml-2 space-y-2 rounded-md border border-border bg-surface px-3 py-2 text-xs">
-          <div>
-            <p className="uppercase tracking-wide text-muted-foreground">Input</p>
-            <p className="mt-0.5 leading-relaxed">{step.input_summary || "—"}</p>
+      
+      <div className="rounded-xl border border-border/50 bg-surface/30 transition-all hover:bg-surface/60 overflow-hidden shadow-sm">
+        <button
+          type="button"
+          onClick={() => setOpen((v) => !v)}
+          className="flex w-full items-center gap-3 px-4 py-3 text-left"
+        >
+          <span className="mono text-sm font-bold tracking-tight text-foreground">{step.node_name}</span>
+          {step.policy_rule_fired && <RuleChip rule={step.policy_rule_fired} />}
+          <span className="ml-auto text-xs font-medium text-muted-foreground">
+            {formatDateTime(step.timestamp)}
+          </span>
+          <ChevronDown
+            className={`h-4 w-4 text-muted-foreground transition-transform ${open ? "rotate-180" : ""}`}
+          />
+        </button>
+        {open && (
+          <div className="border-t border-border/50 bg-background/50 px-4 py-4 space-y-4">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Input</p>
+              <div className="font-mono text-xs p-3 rounded-lg bg-[#1e1e1e] text-[#d4d4d4] overflow-x-auto border border-black/20 shadow-inner">
+                {step.input_summary || "—"}
+              </div>
+            </div>
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-1.5">Output</p>
+              <div className="font-mono text-xs p-3 rounded-lg bg-[#1e1e1e] text-[#d4d4d4] overflow-x-auto border border-black/20 shadow-inner">
+                {step.output_summary || "—"}
+              </div>
+            </div>
           </div>
-          <div>
-            <p className="uppercase tracking-wide text-muted-foreground">Output</p>
-            <p className="mt-0.5 leading-relaxed">{step.output_summary || "—"}</p>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </li>
   );
 }
@@ -318,20 +344,23 @@ function EvidencePanel({ answer }: { answer: AnswerFile }) {
       <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
         Evidence
       </h2>
-      <ul className="mt-3 space-y-3">
+      <ul className="mt-4 space-y-4">
         {evidence.map((item, i) => (
-          <li key={i} className="border-b border-border pb-3 last:border-0 last:pb-0">
-            <div className="flex flex-wrap items-center gap-2">
+          <li key={i} className="rounded-xl border border-border/50 bg-background/50 p-4 shadow-sm transition-all hover:shadow-md">
+            <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
               <SourceBadge source={item.source} />
-              <span className="mono text-[11px] text-muted-foreground">{item.ref}</span>
+              <div className="flex items-center gap-1.5 text-muted-foreground bg-surface/50 px-2 py-1 rounded border border-border/50">
+                <Terminal className="h-3 w-3" />
+                <span className="mono text-[11px] font-semibold">{item.ref}</span>
+              </div>
             </div>
-            <p className="mt-1.5 text-sm leading-relaxed">{item.claim}</p>
+            <p className="text-sm font-medium leading-relaxed text-foreground">{item.claim}</p>
             {item.entity_ids.length > 0 && (
-              <div className="mt-1.5 flex flex-wrap gap-1">
+              <div className="mt-3 flex flex-wrap gap-1.5">
                 {item.entity_ids.map((id) => (
                   <span
                     key={id}
-                    className="mono rounded bg-neutral-soft px-1.5 py-0.5 text-[10px] text-muted-foreground"
+                    className="mono rounded-md bg-neutral-soft/50 border border-border/30 px-2 py-0.5 text-[11px] text-muted-foreground"
                   >
                     {id}
                   </span>
@@ -341,7 +370,7 @@ function EvidencePanel({ answer }: { answer: AnswerFile }) {
           </li>
         ))}
         {evidence.length === 0 && (
-          <li className="text-sm text-muted-foreground">No evidence recorded.</li>
+          <li className="text-sm text-muted-foreground italic p-4 rounded-xl border border-dashed border-border/50">No evidence recorded.</li>
         )}
       </ul>
 
@@ -368,18 +397,26 @@ function EvidencePanel({ answer }: { answer: AnswerFile }) {
 function ActionList({ title, actions }: { title: string; actions: NextBestAction[] }) {
   return (
     <div>
-      <p className="text-xs uppercase tracking-wide text-muted-foreground">{title}</p>
-      <ul className="mt-2 space-y-2">
-        {actions.map((a, i) => (
-          <li key={i} className="rounded-md border border-border bg-surface px-3 py-2">
-            <div className="flex items-start justify-between gap-2">
-              <span className="text-sm font-medium">{a.action}</span>
-              <RouteBadge route={a.route} />
-            </div>
-            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">{a.reason}</p>
-          </li>
-        ))}
-        {actions.length === 0 && <li className="text-sm text-muted-foreground">None.</li>}
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">{title}</p>
+      <ul className="space-y-3">
+        {actions.map((a, i) => {
+          const isHighPriority = a.route === "block" || a.route === "investigate" || a.action.includes("BLOCK") || a.action.includes("ALERT");
+          return (
+            <li key={i} className={`rounded-xl border p-4 shadow-sm backdrop-blur-sm transition-all ${isHighPriority ? "border-danger/30 bg-danger/5 hover:bg-danger/10" : "border-border/60 bg-surface/50 hover:bg-surface/80"}`}>
+              <div className="flex items-start justify-between gap-3 mb-2">
+                <div className="flex items-center gap-2 mt-0.5">
+                  {isHighPriority && <ShieldAlert className="h-4 w-4 text-danger shrink-0" />}
+                  <span className={`text-sm font-bold tracking-tight ${isHighPriority ? "text-danger" : "text-foreground"}`}>{a.action}</span>
+                </div>
+                <div className="shrink-0">
+                  <RouteBadge route={a.route} />
+                </div>
+              </div>
+              <p className={`text-sm leading-relaxed ${isHighPriority ? "text-danger/80" : "text-muted-foreground"}`}>{a.reason}</p>
+            </li>
+          );
+        })}
+        {actions.length === 0 && <li className="text-sm text-muted-foreground italic p-4 rounded-xl border border-dashed border-border/50">None recommended.</li>}
       </ul>
     </div>
   );

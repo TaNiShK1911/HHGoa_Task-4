@@ -11,11 +11,11 @@ import type {
 } from "@/types/answerFile";
 
 const tone = {
-  danger: "bg-danger-soft text-danger border-danger/30",
-  warning: "bg-warning-soft text-warning border-warning/30",
-  success: "bg-success-soft text-success border-success/30",
-  info: "bg-info-soft text-info border-info/30",
-  neutral: "bg-neutral-soft text-muted-foreground border-border",
+  danger: "bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800/50",
+  warning: "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800/50",
+  success: "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800/50",
+  info: "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800/50",
+  neutral: "bg-gray-100 text-gray-700 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700",
 } as const;
 
 type Tone = keyof typeof tone;
@@ -32,13 +32,12 @@ function Pill({
   title?: string;
 }) {
   return (
-    <Badge
-      variant="outline"
+    <span
       title={title}
-      className={cn("font-medium tracking-tight", tone[variantTone], className)}
+      className={cn("inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold border shadow-sm transition-colors", tone[variantTone], className)}
     >
       {children}
-    </Badge>
+    </span>
   );
 }
 
